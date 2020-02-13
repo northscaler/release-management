@@ -52,7 +52,7 @@ fi
 
 if npm dist-tag ls | egrep -q "^$RM_TMP_TAG:"; then # try to rm temporary tag if present
   set +e
-  CMD="npm dist-tag rm $RM_PKG_NAME $RM_RM_TMP_TAG"
+  CMD="npm dist-tag rm $RM_PKG_NAME $RM_TMP_TAG"
   echo "$CMD"
   $CMD
 fi
