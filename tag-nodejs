@@ -1,0 +1,37 @@
+#!/usr/bin/env sh
+
+# 'RM' prefix stands for "Release Management"
+
+RM_PACKAGE_JSON=${RM_PACKAGE_JSON:-./package.json}
+RM_STABLE=${RM_STABLE:-stable}
+RM_NEXT=${RM_NEXT:-next}
+
+RM_LATEST=${RM_LATEST:-latest}
+RM_TMP_TAG=${RM_TMP_TAG:-$RM_LATEST}
+
+export RM_PKG=$(node -e "process.stdout.write(require('$RM_PACKAGE_JSON').name)")
+export RM_VERSION=$(node -e "process.stdout.write(require('$RM_PACKAGE_JSON').version)")
+export RM_MINOR_VERSION=$(echo -n $RM_VERSION | egrep -o '^\d+\.\d+')
+export RM_GREATEST_MINOR_VERSION="$(git ls-remote origin | grep refs/heads | egrep -o '/v\d+\.\d+$' | egrep -o '\d+\.\d+$' | sort -t . -k 1,1n -k 2,2n | tail -1)"
+export RM_TAG_PREFIX=$RM_STABLE
+if echo -n "$RM_VERSION" | egrep -q '\-[^\.]+\.\d+$'; then export RM_TAG_PREFIX=$RM_NEXT; fi # if a semver prerelease
+export RM_TAG="$RM_TAG_PREFIX-$RM_MINOR_VERSION"
+
+npm dist-tag add $RM_PKG@$RM_VERSION $RM_TAG
+
+if [ "$RM_TAG_PREFIX" == "$RM_STABLE" ]; then # this is a stable release
+  if [ "$RM_MINOR_VERSION" == "$RM_GREATEST_MINOR_VERSION" ]; then # add "latest" tag if latest stable release
+    if npm dist-tag ls | egrep -q "^$RM_LATEST:"; then # rm "latest" tag if present
+      npm dist-tag rm $RM_PKG $RM_LATEST
+    fi
+    npm dist-tag add $RM_PKG@$RM_VERSION $RM_LATEST # now add it
+  fi
+  if npm dist-tag ls | egrep -q "^$RM_NEXT-$RM_MINOR_VERSION:"; then # if a "next-x.y" tag exists, rm it
+    npm dist-tag rm $RM_PKG $RM_NEXT-$RM_MINOR_VERSION
+  fi
+fi
+
+if npm dist-tag ls | egrep -q "^$RM_TMP_TAG:"; then # try to rm temporary tag if present
+  set +e
+  npm dist-tag rm $RM_PKG $RM_RM_TMP_TAG
+fi
