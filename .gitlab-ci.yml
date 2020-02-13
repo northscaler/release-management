@@ -1,8 +1,16 @@
+variables:
+  DOCKER_TLS_CERTDIR: ""
+
+before_script:
+  - docker info
+
 stages:
   - build
 
 build:
   stage: build
-  image: scispike/release-mgmt:1.0.0
+  image: alpine:3.11.3
+  services:
+    - docker:dind
   script:
     - ./test/test-all.sh
