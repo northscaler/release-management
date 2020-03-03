@@ -5,7 +5,7 @@ In this strategy, the `master` branch contains the latest & greatest code, and b
 
 ## TL;DR
 ```sh
-$ git clone git@github.com:northscaler/release-management.git /tmp/northscaler/release-mgmt
+$ git clone git@github.com:northscaler-public/release-management.git /tmp/northscaler/release-mgmt
 $ alias release=/tmp/northscaler/release-management/release
 $
 $ # For a Node.js project using npm:
