@@ -10,6 +10,10 @@ PREFIX="${PREFIX:-$THIS_ABSPATH/..}"
 # set to empty string to disable
 export RELEASE_DEBUG=
 
+if [ "$TEST_TYPE" == chart ]; then
+  export CHART_DIR=release-test-chart
+fi
+
 # TODO: assertions & test saddy paths
 
 (

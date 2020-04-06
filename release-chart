@@ -27,13 +27,8 @@
 usage_chart() {
     cat<<EOF
 usage:
-if on $MASTER branch: release $PRE_USAGE|$RC_USAGE [chart]
-if on release branch: release major|minor|patch|$PRE_USAGE [chart]
-
-where:
-  chart is the name of the chart and its directory, unless it is ".."
-    * if ".." is given, chart name is assumed to be the name of the directory containing the current working directory, otherwise
-    * the default value is the only directory name in this directory that does not start with ".", unless there are multiple
+if on $MASTER branch: release $PRE_USAGE|$RC_USAGE
+if on release branch: release major|minor|patch|$PRE_USAGE
 
 optional supported environment variables:
 
@@ -46,34 +41,12 @@ TAG_SUFFIX                          suffix for tags, default ''
 BRANCH_PREFIX                       prefix for release branches, default 'v'
 BRANCH_SUFFIX                       suffix for release branches, default '' ('.x' is common)
 NO_GIT_DISCOVERY_ACROSS_FILESYSTEM  whether to not set GIT_DISCOVERY_ACROSS_FILESYSTEMS, default ''
-CHART_DIR                           name of chart directory, default derived from given chart name
-CHART_FILE                          name of chart file, default derived from chart directory
+CHART_DIR                           name of chart directory
 EOF
 }
 
-CHART_NAME="$(echo "$3" | $MATCH '(.*)/?$' | awk '{ print $1 }')" # drop trailing slash if it's there
-if [ "$CHART_NAME" = '..' ]; then
-  CHART_NAME="$(basename $(pwd) | $MATCH '(.*)/?$' | awk '{ print $1 }')"
-  CHART_DIR=${CHART_DIR:-.}
-elif [ -n "$CHART_NAME" ]; then
-  CHART_NAME="$(echo "$CHART_NAME" | $MATCH '(.*)/?$' | awk '{ print $1 }')"
-  CHART_DIR="${CHART_DIR:-$CHART_NAME}"
-else # no chart name given; see if there is a single directory in pwd that doesn't start with "."
-  NON_DOT_DIRS="$(find . -type d -maxdepth 1 | sed 's|^\./||g' | grep -v '^\.')" # directories that don't start with '.'
-  if [ $(echo "$NON_DOT_DIRS" | wc -l | xargs) = 1 ]; then # we'll assume this sole dir is chart dir
-    CHART_NAME="$(echo "$NON_DOT_DIRS" | $MATCH '(.*)/?$' | awk '{ print $1 }')"
-    echo "INFO: using $CHART_NAME as chart name"
-  else
-    echo "ERROR: no chart name given & can't guess chart name from child directories in this directory"
-    usage
-    exit 1
-  fi
-  CHART_DIR="${CHART_DIR:-$CHART_NAME}"
-fi
-CHART_DIR="$(echo "$CHART_DIR" | $MATCH '(.*)/?$' | awk '{ print $1 }')"
+CHART_DIR=${CHART_DIR:-$(pwd)}
 CHART_FILE="${CHART_FILE:-$CHART_DIR/Chart.yaml}"
-echo "INFO: using chart name:      $CHART_NAME"
-echo "INFO: using chart directory: $CHART_DIR"
 echo "INFO: using chart file:      $CHART_FILE"
 
 getVersion_chart() {
