@@ -47,7 +47,7 @@ EOF
 
 CHART_DIR=${CHART_DIR:-$(pwd)}
 CHART_FILE="${CHART_FILE:-$CHART_DIR/Chart.yaml}"
-echo "INFO: using chart file:      $CHART_FILE"
+echo "INFO: using chart file: $CHART_FILE"
 
 getVersion_chart() {
   cat "$CHART_FILE" | $YMLX this.version
