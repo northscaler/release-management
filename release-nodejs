@@ -48,28 +48,27 @@ EOF
 PACKAGE_JSON="${PACKAGE_JSON:-package.json}"
 echo "INFO: using project file: $PACKAGE_JSON"
 
-FX_nodejs=fx
-if [ -n "$NO_USE_LOCAL_FX" ] || ! which $FX_nodejs; then
-  FX_nodejs="docker run --rm -v "$(pwd)"/$PACKAGE_JSON:/$PACKAGE_JSON scispike/fx:latest $PACKAGE_JSON"
+PACKAGE_JSON_DIR="$(dirname "$PACKAGE_JSON" | sed -E "s|^\.|$PWD|")"
+
+NODEJS_DOCKER="docker run --rm -i -v $PACKAGE_JSON_DIR:$PACKAGE_JSON_DIR -w $PACKAGE_JSON_DIR node"
+NODEJS=node
+if [ -n "$NO_USE_LOCAL_NODEJS" ] || ! $NODEJS --version >/dev/null 2>&1; then
+  NODEJS="$NODEJS_DOCKER node"
+fi
+NPM=npm
+if [ -n "$NO_USE_LOCAL_NPM" ] || ! $NPM --version >/dev/null 2>&1; then
+  NPM="$NODEJS_DOCKER npm"
 fi
 
 getVersion_nodejs() {
-  cat "$PACKAGE_JSON" | $FX_nodejs this.version | sed 's/"//g'
+  (cd "$PACKAGE_JSON_DIR" && $NODEJS -e 'console.log(require("./package.json").version)')
 }
 
 # usage: setVersion version
 setVersion_nodejs() {
   V=$1
-  VERSION_FILE_CONTENT="$(cat $PACKAGE_JSON | $FX_nodejs "it => { it.version = \"$V\"; return it; }")"
-  echo "$VERSION_FILE_CONTENT" | sed 's|\\|\\\\|g' > $PACKAGE_JSON
+  (cd "$PACKAGE_JSON_DIR" && $NPM version --no-git-tag-version --allow-same-version $V)
   echo "INFO: set 'version' attribute in $PACKAGE_JSON to $V"
   echo "$PACKAGE_JSON is now:"
   cat "$PACKAGE_JSON"
-  echo "INFO: running npm install to update package-lock.json"
-  if [ -f /.dockerenv ]; then
-    NODE_MODULES_WORKDIR=/tmp/node-work
-    mkdir -p $NODE_MODULES_WORKDIR
-    PREFIX_ARG="--prefix $NODE_MODULES_WORKDIR"
-  fi
-  npm install $PREFIX_ARG
 }

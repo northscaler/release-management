@@ -59,7 +59,7 @@ We currently support release management for
 * Docker images using `Dockerfile`'s `LABEL` directive with a `version=` label (`release-image`)
 * Node.js projects (`release-nodejs`) using `npm` along with `package.json` (`yarn` is a TODO)
 * Projects that use a plain-text `VERSION` file (by any name)
-* .NET projects in c# that use a AssemblyInfo.cs file
+* .NET projects in C# that use an `AssemblyInfo.cs` file
 
 If you need to support other project types, see below for developer information.
 
@@ -104,7 +104,7 @@ If your current directory _is_ the root of your git repo:
 ```
 $ docker run --rm -i -v "$PWD:/gitrepo" -e EMAIL=you@example.com northscaler/release xxx pre # or rc, minor, patch, ...
 ```
-Just replace `xxx` above with `image`, `chart`, `nodejs`, `version`, or whatever else we support in the future.
+Just replace `xxx` above with `image`, `chart`, `nodejs`, `version`, any combination thereof (separated by `+`, like `nodejs+image`) or whatever else we support in the future.
 
 ## For Developers of This Module
 * This project Eats Its Own Dog Food™.
