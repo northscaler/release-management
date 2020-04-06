@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-set -ex
+set -e
 
 TEST_TYPE="$1"
 THIS_ABSPATH="$(cd "$(dirname "$0")"; pwd)"
@@ -8,7 +8,7 @@ SCRIPT="${SCRIPT:-release}"
 PREFIX="${PREFIX:-$THIS_ABSPATH/..}"
 
 # set to empty string to disable
-export RELEASE_DEBUG=1
+export RELEASE_DEBUG=
 
 # TODO: assertions & test saddy paths
 
