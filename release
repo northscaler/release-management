@@ -170,8 +170,8 @@ else
 fi
 
 BRANCH="$(git status | head -n 1 | awk '{ print $3 }')"
-if ! $MATCH "^(master|$BRANCH_PREFIX[0-9]{1,}\.[0-9]{1,}$BRANCH_SUFFIX)$" "$BRANCH"; then # it is not a master or a release branch
-  echo "ERROR: you can only release from the master branch or release branches! You are currently on $BRANCH" >&2
+if ! $MATCH "^($MASTER|$BRANCH_PREFIX[0-9]{1,}\.[0-9]{1,}$BRANCH_SUFFIX)$" "$BRANCH"; then # it is not a master or a release branch
+  echo "ERROR: you can only release from the $MASTER branch or release branches! You are currently on $BRANCH" >&2
   exit 3
 else
   echo "INFO: on branch $BRANCH, from which releases are allowed"
