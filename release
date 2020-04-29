@@ -196,7 +196,7 @@ if [ "$BRANCH" = "$MASTER" ]; then
   esac
 else # this is a release branch
   case "$RELEASE_LEVEL" in
-      rc|patch|minor|major)
+      rc|$RC|patch|minor|major)
         # ok
         ;;
       *)
@@ -211,7 +211,7 @@ echo "INFO: ok to proceed with $RELEASE_LEVEL from branch $BRANCH"
 VERSION="$V_LAST"
 
 if ! $MATCH "\-($PRE|$RC)\.[0-9]{1,}$" "$VERSION"; then
-  echo "ERROR: repository is in an inconsistent state: version does not end in a prerelease suffix! You are currently on branch $BRANCH" >&2
+  echo "ERROR: repository is in an inconsistent state: version does not end in a prerelease suffix ($PRE or $RC)! You are currently on branch $BRANCH" >&2
   exit 3
 fi
 
