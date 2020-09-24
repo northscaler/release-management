@@ -1,3 +1,5 @@
+set -e
+
 #####
 # This script takes care of proper tag management for npm packages, including stable, next & latest tags.
 # Typically, you'll have tags called `latest`, `stable-1.0`, `stable-1.1`, ..., `next-1.1`, `next-1.2`, ...
