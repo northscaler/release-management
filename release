@@ -38,6 +38,8 @@ TAG_PREFIX=${TAG_PREFIX:-''}
 TAG_SUFFIX=${TAG_SUFFIX:-''}
 BRANCH_PREFIX=${BRANCH_PREFIX:-'v'}
 BRANCH_SUFFIX=${BRANCH_SUFFIX:-''} # '.x' is a common one
+GIT_COMMIT_OPTS=${GIT_COMMIT_OPTS:-''} # --no-verify is a common one
+GIT_PUSH_OPTS=${GIT_PUSH_OPTS:-''} # --no-verify is a common one
 
 if [ -z "$NO_GIT_DISCOVERY_ACROSS_FILESYSTEM" ]; then
   GIT_DISCOVERY_ACROSS_FILESYSTEM=1 # needed when running in a docker container
@@ -218,7 +220,7 @@ fi
 # usage: apply message [tag [remote branch]]
 applyChanges() {
   git add .
-  git commit --allow-empty -m "$1"
+  git commit --allow-empty -m "$1" $GIT_COMMIT_OPTS
   echo "INFO: committed changes with message: $1"
 
   MSG="INFO: pushed commits"
@@ -236,7 +238,7 @@ applyChanges() {
     MSG="$MSG & set tracked upstream to $3/$4"
   fi
 
-  git push $SET_UPSTREAM_ARGS
+  git push $GIT_PUSH_OPTS $SET_UPSTREAM_ARGS
   git push --tags
 
   echo "$MSG"
