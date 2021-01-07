@@ -2,7 +2,7 @@
 
 # MIT License
 #
-# Copyright (c) 2018 Northscaler, Inc.
+# Copyright (c) 2021 Northscaler, Inc.
 #
 # Permission is hereby granted, free of charge, to any person obtaining a copy
 # of this software and associated documentation files (the "Software"), to deal
@@ -245,7 +245,9 @@ applyChanges() {
 }
 
 if [ "$BRANCH" = "$MASTER" ]; then # this will be either an rc, resulting in a new release branch, or a pre
+  set +e
   MATCHES="$($MATCH "^([0-9]{1,})\.([0-9]{1,})\.0\-$PRE\.([0-9]{1,})$" "$VERSION")"
+  set -e
   if [ -z "$MATCHES" ]; then
     echo "ERROR: the version does not match the format of major.minor.0-$PRE.n required in the $MASTER branch." >&2
     exit 8
@@ -315,8 +317,9 @@ if [ "$BRANCH" = "$MASTER" ]; then # this will be either an rc, resulting in a n
 fi
 
 # If we get this far, we are releasing something from a release branch.
-
+set +e
 MATCHES="$($MATCH "^([0-9]{1,})\.([0-9]{1,})\.([0-9]{1,})\-$RC\.([0-9]{1,})$" "$VERSION")"
+set -e
 if [ -z "$MATCHES" ]; then
   echo "ERROR: the version does not match the format of major.minor.patch-$RC.n required in the release branch." >&2
   exit 8
