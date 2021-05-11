@@ -60,6 +60,7 @@ We currently support release management for
 * Node.js projects (`release-nodejs`) using `npm` along with `package.json` (`yarn` is a TODO)
 * Projects that use a plain-text `VERSION` file (by any name)
 * .NET projects in C# that use an `AssemblyInfo.cs` file
+* Maven projects that use a `pom.xml` file
 
 If you need to support other project types, see below for developer information.
 

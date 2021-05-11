@@ -55,6 +55,11 @@ if ! which $YMLX; then
   export YMLX="docker run --rm -i matthewadams12/$YMLX"
 fi
 
+XMLSTARLET=xmlstarlet
+if ! which $XMLSTARLET; then
+  export XMLSTARLET="docker run --rm -i jakubsacha/docker-$XMLSTARLET"
+fi
+
 # support custom "pre" tokens
 PRE=${PRE:-pre}
 PRE_USAGE=pre
