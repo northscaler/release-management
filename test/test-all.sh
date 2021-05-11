@@ -2,7 +2,7 @@
 set -e
 
 THIS_ABSPATH="$(cd "$(dirname "$0")"; pwd)"
-TYPES=${@:-nodejs chart version image nodejs+image csharp}
+TYPES=${@:-nodejs chart version image nodejs+image csharp mavenpomxml}
 
 for type in $TYPES; do
   export TEST_DOCKER=
