@@ -55,7 +55,8 @@ getVersion_mavenpomxml() {
 # usage: setVersion version
 setVersion_mavenpomxml() {
   V=$1
-  echo "new version $V"
+  echo "INFO: version is now $V"
 
-  cat $POM_FILE | $XMLSTARLET ed -N x=http://maven.apache.org/POM/4.0.0 -u /x:project/x:version -v $V
+  cat $POM_FILE | $XMLSTARLET ed -P -N x=http://maven.apache.org/POM/4.0.0 -u /x:project/x:version -v $V > $POM_FILE.tmp
+  mv $POM_FILE.tmp $POM_FILE
 }
