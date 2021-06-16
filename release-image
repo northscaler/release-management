@@ -41,7 +41,7 @@ TAG_SUFFIX                          suffix for tags, default ''
 BRANCH_PREFIX                       prefix for release branches, default 'v'
 BRANCH_SUFFIX                       suffix for release branches, default '' ('.x' is common)
 NO_GIT_DISCOVERY_ACROSS_FILESYSTEM  whether to not set GIT_DISCOVERY_ACROSS_FILESYSTEMS, default ''
-VERSION_FILE                        name of file containing version, default 'Dockerfile'
+DOCKER_FILE                         name of file containing version, default 'Dockerfile'
 VERSION_LABEL                       name of LABEL entry containing version, default 'version'
 EOF
 }

@@ -40,6 +40,18 @@ $ release csharp rc    # release a release candidate
 $ release csharp minor # release a minor version
 $ release csharp patch # release a patch
 $
+$ # For a maven project that uses a pom.xml:
+$ release mavenpomxml pre   # release a preview
+$ release mavenpomxml rc    # release a release candidate
+$ release mavenpomxml minor # release a minor version
+$ release mavenpomxml patch # release a patch
+$
+$ # For a project that uses a build.gradle file:
+$ release gradle pre   # release a preview
+$ release gradle rc    # release a release candidate
+$ release gradle minor # release a minor version
+$ release gradle patch # release a patch
+$
 $ # To use the Docker image to release a Node.js preview:
 $ docker run \
     --rm \
@@ -61,6 +73,7 @@ We currently support release management for
 * Projects that use a plain-text `VERSION` file (by any name)
 * .NET projects in C# that use an `AssemblyInfo.cs` file
 * Maven projects that use a `pom.xml` file
+* Projects that use a `build.gradle` file
 
 If you need to support other project types, see below for developer information.
 
@@ -117,7 +130,9 @@ Valid values for `$1`, initially, are
   * `chart` for Helm Charts,
   * `image` for Docker images,
   * `nodejs` for Node.js projects using `npm`,
-  * `csharp` for Node.js projects using C#, and
+  * `csharp` for Node.js projects using C#,
+  * `mavenpomxml` for maven projects that use a `pom.xml` file,
+  * `gradle` for projects that use a `build.gradle` file, and
   * `version` for projects that use a simple text file called `VERSION`.
 
 * Tests are in `test/`
