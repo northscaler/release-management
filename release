@@ -218,7 +218,7 @@ echo "INFO: ok to proceed with $RELEASE_LEVEL from branch $BRANCH"
 VERSION="$V_LAST"
 
 if ! $MATCH "\-($PRE|$RC)\.[0-9]{1,}$" "$VERSION"; then
-  echo "ERROR: repository is in an inconsistent state: version does not end in a prerelease suffix ($PRE or $RC)! You are currently on branch $BRANCH" >&2
+  echo "ERROR: repository is in an inconsistent state: version ($VERSION) does not end in a prerelease suffix ($PRE or $RC)! You are currently on branch $BRANCH" >&2
   exit 3
 fi
 
