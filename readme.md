@@ -52,6 +52,12 @@ $ release gradle rc    # release a release candidate
 $ release gradle minor # release a minor version
 $ release gradle patch # release a patch
 $
+$ # For a project that uses a build.sbt file:
+$ release sbt pre   # release a preview
+$ release sbt rc    # release a release candidate
+$ release sbt minor # release a minor version
+$ release sbt patch # release a patch
+$
 $ # To use the Docker image to release a Node.js preview:
 $ docker run \
     --rm \
@@ -74,6 +80,7 @@ We currently support release management for
 * .NET projects in C# that use an `AssemblyInfo.cs` file
 * Maven projects that use a `pom.xml` file
 * Projects that use a `build.gradle` file
+* Scala projects that use a `build.sbt` file
 
 If you need to support other project types, see below for developer information.
 
@@ -132,7 +139,8 @@ Valid values for `$1`, initially, are
   * `nodejs` for Node.js projects using `npm`,
   * `csharp` for Node.js projects using C#,
   * `mavenpomxml` for maven projects that use a `pom.xml` file,
-  * `gradle` for projects that use a `build.gradle` file, and
+  * `gradle` for projects that use a `build.gradle` file,
+  * `sbt` for projects that use a `build.sbt` file, and
   * `version` for projects that use a simple text file called `VERSION`.
 
 * Tests are in `test/`
