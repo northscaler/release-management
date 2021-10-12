@@ -46,7 +46,7 @@ $ release mavenpomxml rc    # release a release candidate
 $ release mavenpomxml minor # release a minor version
 $ release mavenpomxml patch # release a patch
 $
-$ # For a project that uses a build.gradle file:
+$ # For a project that uses a build.gradle.kts file:
 $ release gradle pre   # release a preview
 $ release gradle rc    # release a release candidate
 $ release gradle minor # release a minor version
