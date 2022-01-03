@@ -1,8 +1,7 @@
 #!/usr/bin/env bash
-
 # MIT License
 #
-# Copyright (c) 2021 Northscaler, Inc.
+# Copyright (c) 2022 Northscaler, Inc.
 #
 # Permission is hereby granted, free of charge, to any person obtaining a copy
 # of this software and associated documentation files (the "Software"), to deal
@@ -22,30 +21,21 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
 
-# This script implements the minor-release-per-branch workflow projects using git for source control.
-
-if [ -n "$RELEASE_DEBUG" ]; then
-  set -x
-fi
+# This script implements a minor-release-per-branch workflow projects using git for source control.
+# It supports many different technologies by using low-tech means (sed, awk, etc) to manage version strings.
 
 set -e
 
-THIS_ABSPATH="$(cd "$(dirname "$0")"; pwd)"
+THIS_ABSPATH="$(
+  cd "$(dirname "$0")"
+  pwd
+)"
 
-ORIGIN=${ORIGIN:-origin}
-MAIN=${MAIN:-main}
-TAG_PREFIX=${TAG_PREFIX:-''}
-TAG_SUFFIX=${TAG_SUFFIX:-''}
-BRANCH_PREFIX=${BRANCH_PREFIX:-'v'}
-BRANCH_SUFFIX=${BRANCH_SUFFIX:-''} # '.x' is a common one
-GIT_COMMIT_OPTS=${GIT_COMMIT_OPTS:-''} # --no-verify is a common one
-GIT_PUSH_OPTS=${GIT_PUSH_OPTS:-''} # --no-verify is a common one
-PRE=${PRE:-pre}
-RC=${RC:-rc}
-
-if [ -z "$NO_GIT_DISCOVERY_ACROSS_FILESYSTEM" ]; then
-  GIT_DISCOVERY_ACROSS_FILESYSTEM=1 # needed when running in a docker container
-fi
+verbose() {
+  if [ -n "$VERBOSE" ]; then
+    echo "$1"
+  fi
+}
 
 MATCH=match
 if ! which $MATCH; then
@@ -62,37 +52,465 @@ if ! which $XMLSTARLET; then
   export XMLSTARLET="docker run --rm -i jakubsacha/docker-$XMLSTARLET"
 fi
 
-PRE_USAGE=pre
-if [ "$PRE" != "pre" ]; then
-  PRE_USAGE="$PRE_USAGE|$PRE"
+ORIGIN=${ORIGIN:-origin}
+MAIN=${MAIN:-main}
+TAG_PREFIX=${TAG_PREFIX:-''}
+TAG_SUFFIX=${TAG_SUFFIX:-''}
+BRANCH_PREFIX=${BRANCH_PREFIX:-'v'}
+BRANCH_SUFFIX=${BRANCH_SUFFIX:-''}     # '.x' is a common one
+GIT_COMMIT_OPTS=${GIT_COMMIT_OPTS:-''} # --no-verify is a common one
+GIT_PUSH_OPTS=${GIT_PUSH_OPTS:-''}     # --no-verify is a common one
+DEFAULT_PRE=${DEFAULT_PRE:-$MAIN}
+DEFAULT_RC=${DEFAULT_RC:-rc}
+PRE=${PRE:-$DEFAULT_PRE}
+RC=${RC:-$DEFAULT_RC}
+VERBOSE=${VERBOSE:-''}
+
+#####
+##### begin Helm Chart support
+#####
+HELM_CHART_DIR=${HELM_CHART_DIR:-$(pwd)}
+HELM_CHART_FILE="${HELM_CHART_FILE:-Chart.yaml}"
+
+getVersion_helm() {
+  local HELM_CHART_FILE_PATHNAME="$HELM_CHART_DIR/$HELM_CHART_FILE"
+  cat "$HELM_CHART_FILE_PATHNAME" | $YMLX this.version
+}
+
+setVersion_helm() {
+  local V=$1
+  local HELM_CHART_FILE_PATHNAME="$HELM_CHART_DIR/$HELM_CHART_FILE"
+  local CHART_CONTENT="$(cat $HELM_CHART_FILE_PATHNAME)"
+  echo "$CHART_CONTENT" \
+    | $YMLX "it => { it.version = \"$V\"; return it; }" \
+    > $HELM_CHART_FILE_PATHNAME
+  verbose "$HELM_CHART_FILE_PATHNAME is now: $(cat "$HELM_CHART_FILE_PATHNAME")"
+}
+#####
+##### end Helm Chart support
+#####
+
+#####
+##### begin C# support
+#####
+CSHARP_FILE="${CSHARP_FILE:-AssemblyInfo.cs}"
+
+getVersion_csharp() {
+  cat $CSHARP_FILE | grep AssemblyInformationalVersion | $MATCH \".*\" | sed 's/"//g'
+}
+
+setVersion_csharp() {
+  local VER="$(echo "$1" | $MATCH '([0-9]{1,}\.[0-9]{1,}\.[0-9]{1,})' | awk '{print $2}')"
+  local FV="$VER.0"
+  local AV="$VER.*"
+
+  local FC="$(cat "$CSHARP_FILE")"
+  echo "$FC" \
+  | sed "s/AssemblyFileVersion.*/AssemblyFileVersion\(\"$FV\"\)]/" \
+  | sed "s/AssemblyVersion.*/AssemblyVersion\(\"$AV\"\)]/" \
+  | sed "s/AssemblyInformationalVersion.*/AssemblyInformationalVersion\(\"$1\"\)]/" \
+  > "$CSHARP_FILE"
+  verbose "$CSHARP_FILE is now: $(cat cat "$CSHARP_FILE")"
+}
+#####
+##### end C# support
+#####
+
+#####
+##### begin gradle support
+#####
+GRADLE_FILE="${GRADLE_FILE:-build.gradle}"
+
+getVersion_gradle() {
+  cat $GRADLE_FILE | egrep "^version" | $MATCH \'.*\' | sed "s/'//g"
+}
+
+# usage: setVersion version
+setVersion_gradle() {
+  local V=$1
+  local FC="$(cat "$GRADLE_FILE")"
+  echo "$FC" \
+  | sed "s/^version.*/version = \'$V\'/" \
+  > "$GRADLE_FILE"
+  verbose "$GRADLE_FILE is now: $(cat cat "$GRADLE_FILE")"
+}
+#####
+##### end gradle support
+#####
+
+#####
+##### begin gradlekts support
+#####
+GRADLE_KOTLIN_FILE="${GRADLE_KOTLIN_FILE:-build.gradle.kts}"
+
+getVersion_gradlekts() {
+  cat $GRADLE_KOTLIN_FILE | egrep "^version" | $MATCH \'.*\' | sed "s/'//g"
+}
+
+# usage: setVersion version
+setVersion_gradlekts() {
+  local V=$1
+
+  local FC="$(cat "$GRADLE_KOTLIN_FILE")"
+  echo "$FC" \
+  | sed "s/^version.*/version = \"$V\"/" \
+  > "$GRADLE_KOTLIN_FILE"
+  verbose "$GRADLE_KOTLIN_FILE is now: $(cat cat "$GRADLE_KOTLIN_FILE")"
+}
+#####
+##### end gradlekts support
+#####
+
+#####
+##### begin Docker image support
+#####
+DOCKER_FILE="${DOCKER_FILE:-Dockerfile}"
+DOCKER_FILE_VERSION_LABEL="${DOCKER_FILE_VERSION_LABEL:-version}"
+
+getVersion_docker() {
+  echo $(egrep '^LABEL' "$DOCKER_FILE" | egrep -o "$DOCKER_FILE_VERSION_LABEL=\"?[0-9]+\.[0-9]+\.[0-9]+(-[^ \"]*)?\"?" | cut -d'=' -f2 | sed 's/"//g')
+}
+
+setVersion_docker() {
+  local V=$1
+  local label
+  local first=true
+  printf "$(cat "$DOCKER_FILE")\n" | while read line; do
+    label="$(echo "$line"  | egrep '^LABEL' | egrep "$DOCKER_FILE_VERSION_LABEL=\"?[0-9]+\.[0-9]+\.[0-9]+(-[^ \"]*)?\"?" || true)"
+    if [ -z "$label" ]; then # skip it
+      if [ $first = true ]; then
+        first=false
+        VERSION_FILE_CONTENT="$line"
+      else
+        VERSION_FILE_CONTENT="$VERSION_FILE_CONTENT\n$line"
+      fi
+    else # we found the LABEL line with the version=<semver> in it; replace & append to VERSION_FILE_CONTENT
+      line="$(echo "$label" | sed -E "s/$VERSION_LABEL=\"?[0-9]+\.[0-9]+\.[0-9]+(-[^ \"]*)?\"?/$VERSION_LABEL=$1/")"
+      VERSION_FILE_CONTENT="$VERSION_FILE_CONTENT\n$line"
+    fi
+    printf "$VERSION_FILE_CONTENT" > "$DOCKER_FILE"
+  done
+  VERSION_FILE_CONTENT="$(cat "$DOCKER_FILE")\n"
+  printf "$VERSION_FILE_CONTENT" > "$DOCKER_FILE"
+
+  verbose "$DOCKER_FILE is now: $(cat cat "$DOCKER_FILE")"
+}
+#####
+##### end Docker image support
+#####
+
+#####
+##### begin Maven pom.xml support
+#####
+MAVEN_FILE="${MAVEN_FILE:-pom.xml}"
+
+getVersion_maven() {
+  cat $MAVEN_FILE | $XMLSTARLET sel -N x=http://maven.apache.org/POM/4.0.0 -t -v /x:project/x:version -
+}
+
+setVersion_maven() {
+  local V=$1
+
+  cat $MAVEN_FILE | $XMLSTARLET ed -P -N x=http://maven.apache.org/POM/4.0.0 -u /x:project/x:version -v $V > $MAVEN_FILE.tmp
+  mv $MAVEN_FILE.tmp $MAVEN_FILE
+  verbose "$MAVEN_FILE is now: $(cat "$MAVEN_FILE")"
+}
+#####
+##### end Maven pom.xml support
+#####
+
+#####
+##### begin nodejs package.json support
+#####
+NODEJS_DOCKER="docker run --rm -i -v '$NODEJS_PACKAGE_JSON_DIR:$NODEJS_PACKAGE_JSON_DIR' -w '$NODEJS_PACKAGE_JSON_DIR' node"
+NODEJS_NODE=node
+if [ -n "$NO_USE_LOCAL_NODEJS" ] || ! $NODEJS_NODE --version >/dev/null 2>&1; then
+  NODEJS_NODE="$NODEJS_DOCKER node"
 fi
 
-RC_USAGE=rc
-if [ "$RC" != "rc" ]; then
-  RC_USAGE="$RC_USAGE|$RC"
+NODEJS_NPM=npm
+if [ -n "$NO_USE_LOCAL_NPM" ] || ! $NODEJS_NPM --version >/dev/null 2>&1; then
+  NODEJS_NPM="$NODEJS_DOCKER npm"
+fi
+
+NODEJS_PACKAGE_JSON="${NODEJS_PACKAGE_JSON:-package.json}"
+
+getVersion_nodejs() {
+  (cd "$NODEJS_PACKAGE_JSON_DIR" && $NODEJS_NODE -e 'console.log(require("./package.json").version)')
+}
+
+setVersion_nodejs() {
+  local V=$1
+  (cd "$NODEJS_PACKAGE_JSON_DIR" && $NODEJS_NPM version --no-git-tag-version --allow-same-version $V)
+  verbose "$NODEJS_PACKAGE_JSON is now: $(cat "$NODEJS_PACKAGE_JSON")"
+}
+#####
+##### end nodejs package.json support
+#####
+
+#####
+##### begin Scala SBT support
+#####
+SCALA_SBT_FILE="${SCALA_SBT_FILE:-build.sbt}"
+
+getVersion_sbt() {
+  cat $SCALA_SBT_FILE | egrep "^version\s*\:\=.*" | $MATCH \".*\" | sed 's/"//g'
+}
+
+setVersion_sbt() {
+  local V=$1
+
+  local FC="$(cat "$SCALA_SBT_FILE")"
+  echo "$FC" \
+  | sed "s/^version.*/version := \"$V\"/" \
+  > "$SCALA_SBT_FILE"
+  verbose "$SCALA_SBT_FILE is now: $(cat "$SCALA_SBT_FILE")"
+}
+#####
+##### end Scala SBT support
+#####
+
+#####
+##### begin VERSION file support
+#####
+VERSION_FILE="${VERSION_FILE:-VERSION}"
+
+getVersion_version() {
+  cat "$VERSION_FILE"
+}
+
+setVersion_version() {
+  local V=$1
+  echo "$V" > $VERSION_FILE
+  verbose "$VERSION_FILE is now: $(cat "$VERSION_FILE")"
+}
+#####
+##### end VERSION file support
+#####
+
+usage() {
+  echo "Performs release commits, tags & branching"
+
+  PRE_USAGE=$DEFAULT_PRE
+  if [ "$PRE" != "$DEFAULT_PRE" ]; then
+    PRE_USAGE="$PRE_USAGE|$PRE"
+  fi
+
+  RC_USAGE=$DEFAULT_RC
+  if [ "$RC" != "$DEFAULT_RC" ]; then
+    RC_USAGE="$RC_USAGE|$RC"
+  fi
+
+  echo Usage:
+  printf "%s --tech tech1,tech2,... [options] $PRE_USAGE|$RC_USAGE|minor|patch\n \
+  where options are as follows (last one wins):\n \
+  --tech|-t                           # required at least once, the technology types to release (comma-delimited list ok); choose from:\n \
+                                      #  'helm' for Helm Chart (Chart.yaml),\n \
+                                      #  'docker' for Docker Image (Dockerfile),\n \
+                                      #  'nodejs' for Node.js (package.json),\n \
+                                      #  'csharp' for C# (AssemblyInformationalVersion in AssemblyInfo.cs),\n \
+                                      #  'scala' for Scala (build.sbt),\n \
+                                      #  'gradle' for Gradle (build.gradle),\n \
+                                      #  'gradlekts' for Kotlin Gradle (build.gradle.kts),\n \
+                                      #  'maven' for Maven XML (pom.xml),\n \
+                                      #  'version' for plain text version file (VERSION),\n \
+  [--origin|-o origin]                # optional, git origin, default '%s'\n \
+  [--main|-m main]                    # optional, git main branch, default '%s'\n \
+  [--release-tag-prefix|-p prefix]    # optional, git release tag prefix, default '%s'\n \
+  [--release-tag-suffix|-s suffix]    # optional, git release tag suffix, default  '%s'\n \
+  [--release-branch-prefix|-P prefix] # optional, git release branch prefix, default '%s'\n \
+  [--release-branch-suffix|-S suffix] # optional, git release branch suffix, default '%s' ('.x' is common)\n \
+  [--git-commit-opts|-o opts]         # optional, git commit options, default '%s' ('--no-verify' is common)\n \
+  [--git-push-opts|-O opts]           # optional, git commit options, default '%s' ('--no-verify' is common)\n \
+  [--pre-release-token|-k token]      # optional, pre release token, default '%s'\n \
+  [--rc-release-token|-K token]       # optional, release candidate release token, default '%s'\n \
+  [--dev-qa]                          # optional, shortcut for '--pre-release-token dev --rc-release-token qa'\n \
+  [--alpha-beta]                      # optional, shortcut for '--pre-release-token alpha --rc-release-token beta'\n \
+  [--pre-rc]                          # optional, shortcut for '--pre-release-token pre --rc-release-token rc' (legacy behavior)\n \
+  [--helm-chart-dir chartDir]         # optional, chart directory, default cwd ('%s')\n \
+  [--helm-chart-file chartFile]       # optional, chart filename, default '%s'\n \
+  [--csharp-file csharpFile]          # optional, csharp filename, default '%s'\n \
+  [--gradle-file gradleFile]          # optional, gradle filename, default '%s'\n \
+  [--gradlekts-file gradlektsFile]    # optional, gradlekts filename, default '%s'\n \
+  [--docker-file dockerFile]          # optional, docker filename, default '%s'\n \
+  [--docker-file-version-label label] # optional, docker file version label, default '%s'\n \
+  [--maven-file mavenFile]            # optional, maven POM filename, default '%s'\n \
+  [--nodejs-file packageJson]         # optional, nodejs filename, default '%s'\n \
+  [--scala-file buildSbt]             # optional, scala filename, default '%s'\n \
+  [--version-file versionFile]        # optional, version filename, default '%s'\n \
+  [--verbose|-v]                      # optional, displays detailed progress\n \
+  [--help|-h]                         # optional, displays usage\n" \
+    "$0" \
+    "$ORIGIN" \
+    "$MAIN" \
+    "$TAG_PREFIX" \
+    "$TAG_SUFFIX" \
+    "$BRANCH_PREFIX" \
+    "$BRANCH_SUFFIX" \
+    "$GIT_COMMIT_OPTS" \
+    "$GIT_PUSH_OPTS" \
+    "$PRE" \
+    "$RC" \
+    "$HELM_CHART_DIR" \
+    "$HELM_CHART_FILE" \
+    "$CSHARP_FILE" \
+    "$GRADLE_FILE" \
+    "$GRADLE_KOTLIN_FILE" \
+    "$DOCKER_FILE" \
+    "$DOCKER_FILE_VERSION_LABEL" \
+    "$MAVEN_FILE" \
+    "$NODEJS_PACKAGE_JSON" \
+    "$SCALA_SBT_FILE" \
+    "$VERSION_FILE"
+
+  echo To release a pre release from the "'$MAIN'" branch only, use "'$DEFAULT_PRE'" or "'$PRE'"
+  echo To release a release candidate release from the "'$RC'" branch only, use "'$DEFAULT_RC'" or "'$RC'"
+  echo To release the first minor release from the "'$RC'" branch only, use "'minor'"
+  echo To release a patch from the "'$RC'" branch only, use "'patch'"
+}
+
+# process args
+while [ $# -gt 0 ]; do
+  case "$1" in
+  --tech | -t)
+    shift
+    TECH="$TECH,$1"
+    shift
+    ;;
+  --origin | -o)
+    shift
+    ORIGIN="$1"
+    shift
+    ;;
+  --main | -m)
+    shift
+    MAIN="$1"
+    shift
+    ;;
+  --release-tag-prefix | -p)
+    shift
+    TAG_PREFIX="$1"
+    shift
+    ;;
+  --release-tag-suffix | -s)
+    shift
+    TAG_SUFFIX="$1"
+    shift
+    ;;
+  --release-branch-prefix | -P)
+    shift
+    BRANCH_PREFIX="$1"
+    shift
+    ;;
+  --release-branch-suffix | -S)
+    shift
+    BRANCH_SUFFIX="$1"
+    shift
+    ;;
+  --pre-release-token | -k)
+    shift
+    PRE="$1"
+    shift
+    ;;
+  --rc-release-token | -K)
+    shift
+    RC="$1"
+    shift
+    ;;
+  --dev-qa)
+    PRE=dev
+    RC=qa
+    shift
+    ;;
+  --alpha-beta)
+    PRE=alpha
+    RC=beta
+    shift
+    ;;
+  --pre-rc)
+    PRE=pre
+    RC=rc
+    shift
+    ;;
+  --verbose | -v)
+    VERBOSE=1
+    shift
+    ;;
+  --helm-chart-dir)
+    HELM_CHART_DIR="$1"
+    shift
+    ;;
+  --helm-chart-file)
+    HELM_CHART_FILE="$1"
+    shift
+    ;;
+  --csharp-file)
+    CSHARP_FILE="$1"
+    shift
+    ;;
+  --gradle-file)
+    GRADLE_FILE="$1"
+    shift
+    ;;
+  --gradlekts-file)
+    GRADLE_KOTLIN_FILE="$1"
+    shift
+    ;;
+  --docker-file)
+    DOCKER_FILE="$1"
+    shift
+    ;;
+  --docker-file-version-label)
+    DOCKER_FILE_VERSION_LABEL="$1"
+    shift
+    ;;
+  --maven-file)
+    MAVEN_FILE="$1"
+    shift
+    ;;
+  --scala-file)
+    SCALA_SBT_FILE="$1"
+    shift
+    ;;
+  --nodejs-file)
+    NODEJS_PACKAGE_JSON="$1"
+    NODEJS_PACKAGE_JSON_DIR="$(dirname "$NODEJS_PACKAGE_JSON" | sed -E "s|^\.|$PWD|")"
+    shift
+    ;;
+  --help | -h)
+    usage >&2
+    exit 0
+    ;;
+  *)
+    usage >&2
+    exit 1
+    ;;
+  esac
+done
+
+# validations
+
+# ensure at least one tech given
+TECHNOLOGIES="$(echo -n "$TECH" | tr ',' ' ' | xargs)"
+if [ -z "$TECHNOLOGIES" ]; then
+  echo "ERROR: no technologies given" >&2
+  usage >&2
+  exit 1
 fi
 
 # ensure pre & rc tokens are not the same
 if [ "$PRE" == "$RC" ]; then
-  echo "ERROR: PRE ($PRE) cannot be the same as RC ($RC)" >&2
+  echo "ERROR: pre release token ($PRE) cannot be the same as release candidate release token ($RC)" >&2
+  usage >&2
   exit 1
 fi
 
 # ensure pre token sorts alphabetically before rc token
 if [ "$PRE" \> "$RC" ]; then
-  echo "ERROR: PRE ($PRE) cannot sort alphabetically after RC ($RC)" >&2
+  echo "ERROR: pre release token ($PRE) cannot sort after release candidate release token ($RC)" >&2
+  usage >&2
   exit 1
 fi
-
-if [ $# -lt 2 ]; then
-  echo "Insufficient arguments" >&2
-  echo "Usage: $0 <technology-type>[+<technology-type2>+[<technology-type3>+...]] <release-level>" >&2
-  echo "Example 1: $0 nodejs pre # releases via npm using package.json" >&2
-  echo "Example 2: $0 nodejs+image pre # releases via npm using package.json and versions Dockerfile with it" >&2
-  exit 1
-fi
-
-TECHNOLOGIES="$(echo "$1" | tr '+' ' ')"
 
 # Source technology-specific file(s) for usage_xxx, getVersion_xxx & setVersion_xxx functions
 for T in $TECHNOLOGIES; do
@@ -101,7 +519,7 @@ for T in $TECHNOLOGIES; do
     source "$FUNCTIONS_FILE"
   else
     echo "Unknown technology type: $T" >&2
-    echo "Usage: $0 <technology-type> <release-level>" >&2
+    usage >&2
     exit 1
   fi
 done
@@ -113,41 +531,29 @@ setVersions() {
   done
 }
 
-usages() {
-  for T in $TECHNOLOGIES; do
-    usage_$T
-  done
-}
-
 RELEASE_LEVEL="${@: -1}"
 
 case "$RELEASE_LEVEL" in
-  major|minor|patch|pre|rc|$PRE|$RC)
-    # ok
-    ;;
-  h|he|hel|help)
-    usages
-    exit 0
-    ;;
-  *)
-    if [ -n "$2" ]; then
-      echo "ERROR: specify release level of 'pre' or '$PRE' for prerelease, 'rc' or '$RC' for release candidate, 'patch', 'minor', or 'major'" >&2
-    fi
-    usages
-    exit 1
-    ;;
+minor | patch | $DEFAULT_PRE | $DEFAULT_RC | $PRE | $RC)
+  # ok
+  ;;
+*)
+  echo "ERROR: specify release level of minor|patch|$DEFAULT_PRE|$DEFAULT_RC|$PRE|$RC" >&2
+  usage >&2
+  exit 1
+  ;;
 esac
 
-echo "INFO: checking required preconditions"
+verbose "INFO: checking required preconditions"
 
-git pull
+git pull $ORIGIN
 
 # check that all versions are exactly the same
 for T in $TECHNOLOGIES; do
   V="$(getVersion_$T)"
   if [ -n "$V_LAST" ] && [ "$V_LAST" != "$V" ]; then
     echo "ERROR: versions among different technology files differ: $T is at $V, but $T_LAST is at $V_LAST" >&2
-    exit 33
+    exit 3
   fi
   V_LAST="$V"
   T_LAST="$T"
@@ -157,21 +563,21 @@ if ! git diff --exit-code --no-patch; then
   echo 'ERROR: you have modified tracked files; only release from clean directories!' >&2
   exit 3
 else
-  echo 'INFO: no modified tracked files'
+  verbose 'INFO: no modified tracked files'
 fi
 
 if ! git diff --cached --exit-code --no-patch; then
   echo 'ERROR: you have cached modified tracked files; only release from clean directories!' >&2
   exit 3
 else
-  echo 'INFO: no cached modified tracked files'
+  verbose 'INFO: no cached modified tracked files'
 fi
 
 if [ -n "$(git status -s)" ]; then
   echo 'ERROR: You have unignored untracked files; only release from clean directories!' >&2
   exit 3
 else
-  echo 'INFO: no unignored untracked files'
+  verbose 'INFO: no unignored untracked files'
 fi
 
 BRANCH="$(git status | head -n 1 | awk '{ print $3 }')"
@@ -179,39 +585,39 @@ if ! $MATCH "^($MAIN|$BRANCH_PREFIX[0-9]{1,}\.[0-9]{1,}$BRANCH_SUFFIX)$" "$BRANC
   echo "ERROR: you can only release from the $MAIN branch or release branches! You are currently on $BRANCH" >&2
   exit 3
 else
-  echo "INFO: on branch $BRANCH, from which releases are allowed"
+  verbose "INFO: on branch $BRANCH, from which releases are allowed"
 fi
 
 if ! git diff --exit-code -no-patch $BRANCH $ORIGIN/$BRANCH; then
   echo "ERROR: Local branch $BRANCH differs from remote branch $ORIGIN/$BRANCH" >&2
   exit 3
 else
-  echo "INFO: no differences between local & remote branch $BRANCH"
+  verbose "INFO: no differences between local & remote branch $BRANCH"
 fi
 
-if [ "$BRANCH" = "$MAIN" ]; then
+if [ "$BRANCH" == "$MAIN" ]; then
   case "$RELEASE_LEVEL" in
-    pre|rc|$PRE|$RC)
+    $DEFAULT_PRE|$DEFAULT_RC|$PRE|$RC)
       # ok
       ;;
     *)
-      echo "ERROR: only 'pre'/'$PRE' or 'rc'/'$RC' releases are permitted from the $MAIN branch." >&2
-      exit 6
+      echo "ERROR: only '$DEFAULT_PRE'/'$PRE' or '$DEFAULT_RC'/'$RC' releases are permitted from the $MAIN branch." >&2
+      exit 3
       ;;
   esac
 else # this is a release branch
   case "$RELEASE_LEVEL" in
-      rc|$RC|patch|minor|major)
+      $DEFAULT_RC|$RC|patch|minor)
         # ok
         ;;
       *)
-        echo "ERROR: only 'rc'/'$RC', 'patch', 'minor', or 'major' releases are permitted from a release branch." >&2
-        exit 7
+        echo "ERROR: only '$DEFAULT_RC'/'$RC', 'patch', or 'minor' releases are permitted from a release branch." >&2
+        exit 3
         ;;
   esac
 fi
 
-echo "INFO: ok to proceed with $RELEASE_LEVEL from branch $BRANCH"
+verbose "INFO: ok to proceed with $RELEASE_LEVEL from branch $BRANCH"
 
 VERSION="$V_LAST"
 
@@ -220,18 +626,18 @@ if ! $MATCH "\-($PRE|$RC)\.[0-9]{1,}$" "$VERSION"; then
   exit 3
 fi
 
-# usage: apply message [tag [remote branch]]
+# usage: apply message [tag [remote [branch]]]
 applyChanges() {
   git add .
   git commit --allow-empty -m "$1" $GIT_COMMIT_OPTS
-  echo "INFO: committed changes with message: $1"
+  verbose "INFO: committed changes with message: $1"
 
   MSG="INFO: pushed commits"
 
   if [ -n "$2" ]; then
     tag="$TAG_PREFIX$2$TAG_SUFFIX"
     git tag "$tag"
-    echo "INFO: tagged $tag"
+    verbose "INFO: tagged $tag"
     MSG="$MSG & tags"
   fi
 
@@ -244,28 +650,27 @@ applyChanges() {
   git push $GIT_PUSH_OPTS $SET_UPSTREAM_ARGS
   git push --tags
 
-  echo "$MSG"
+  verbose "$MSG"
 }
 
-if [ "$BRANCH" = "$MAIN" ]; then # this will be either an rc, resulting in a new release branch, or a pre
+if [ "$BRANCH" == "$MAIN" ]; then # this will be either an rc, resulting in a new release branch, or a pre
   set +e
   MATCHES="$($MATCH "^([0-9]{1,})\.([0-9]{1,})\.0\-$PRE\.([0-9]{1,})$" "$VERSION")"
   set -e
   if [ -z "$MATCHES" ]; then
     echo "ERROR: the version does not match the format of major.minor.0-$PRE.n required in the $MAIN branch." >&2
-    exit 8
+    exit 3
   else
     echo "INFO: version $VERSION matches expected format for branch $BRANCH"
   fi
 
-  # create release branch
   MAJOR="$(echo "$MATCHES" | awk '{ print $2 }')"
   MINOR="$(echo "$MATCHES" | awk '{ print $3 }')"
   PATCH=0
   PRERELEASE="$(echo "$MATCHES" | awk '{ print $4 }')"
 
   case "$RELEASE_LEVEL" in
-  rc|$RC) # then it's time to create a new release branch
+  $DEFAULT_RC|$RC) # then it's time to create a new release branch
       NEW_RELEASE_BRANCH="$BRANCH_PREFIX$MAJOR.$MINOR$BRANCH_SUFFIX"
       git checkout -b $NEW_RELEASE_BRANCH
 
@@ -274,36 +679,36 @@ if [ "$BRANCH" = "$MAIN" ]; then # this will be either an rc, resulting in a new
       setVersions $NEW_RELEASE_BRANCH_VERSION
 
       applyChanges "release $NEW_RELEASE_BRANCH_VERSION" $NEW_RELEASE_BRANCH_VERSION $ORIGIN $NEW_RELEASE_BRANCH
-      echo "INFO: created release branch $NEW_RELEASE_BRANCH and tagged $NEW_RELEASE_BRANCH_VERSION for release"
+      verbose "INFO: created release branch $NEW_RELEASE_BRANCH and tagged $NEW_RELEASE_BRANCH_VERSION for release"
 
       # return to master branch
       git checkout $MAIN
-      echo "INFO: checked out $MAIN"
+      verbose "INFO: checked out $MAIN"
 
       git cherry-pick $NEW_RELEASE_BRANCH # cherry pick from release branch to get release candidate commit in master
-      echo "INFO: cherry-picked $NEW_RELEASE_BRANCH $RC commit into $MAIN"
+      verbose "INFO: cherry-picked $NEW_RELEASE_BRANCH $RC commit into $MAIN"
 
       # advance master version
       NEXT_VERSION="$MAJOR.$(($MINOR+1)).0-$PRE.0"
 
-      setVersions $NEXT_VERSION $DOCKER_BUILD_STEP_NAMES
+      setVersions $NEXT_VERSION
 
       applyChanges "bump to $NEXT_VERSION [skip ci]"
 
       # return to release branch & prepare for next prerelease
       git checkout $NEW_RELEASE_BRANCH
-      echo "INFO: checked out $NEW_RELEASE_BRANCH"
+      verbose "INFO: checked out $NEW_RELEASE_BRANCH"
 
       NEXT_RELEASE_BRANCH_VERSION="$MAJOR.$MINOR.0-$RC.1"
 
-      setVersions $NEXT_RELEASE_BRANCH_VERSION $DOCKER_BUILD_STEP_NAMES
+      setVersions $NEXT_RELEASE_BRANCH_VERSION
 
       applyChanges "bump to $NEXT_RELEASE_BRANCH_VERSION [skip ci]"
 
       exit 0
       ;;
 
-  pre|$PRE)
+  $DEFAULT_PRE|$PRE)
       setVersions $VERSION
 
       applyChanges "release $VERSION" $VERSION
@@ -325,9 +730,9 @@ MATCHES="$($MATCH "^([0-9]{1,})\.([0-9]{1,})\.([0-9]{1,})\-$RC\.([0-9]{1,})$" "$
 set -e
 if [ -z "$MATCHES" ]; then
   echo "ERROR: the version does not match the format of major.minor.patch-$RC.n required in the release branch." >&2
-  exit 8
+  exit 3
 else
-  echo "INFO: version $VERSION matches expected format for branch $BRANCH"
+  verbose "INFO: version $VERSION matches expected format for branch $BRANCH"
 fi
 
 MAJOR="$(echo "$MATCHES" | awk '{ print $2 }')"
@@ -341,26 +746,26 @@ case "$RELEASE_LEVEL" in
     # NOTE: if RELEASE_LEVEL is 'minor' & we're prepped for a major release, no harm, no foul.
     # A major release is the same as a minor release, only that the minor version is 0.
 
-    if [ $RELEASE_LEVEL = major ] && [ $MINOR != 0 ]; then
+    if [ "$RELEASE_LEVEL" = "major" ] && [ "$MINOR" != "0" ]; then
       echo "ERROR: this branch is not prepared for a major release because the minor version is $MINOR, not 0." >&2
-      exit 10
+      exit 3
     else
       NEXT_RELEASE_BRANCH_VERSION="$MAJOR.$MINOR.1-$RC.0"
     fi
-    if [ $RELEASE_LEVEL = minor ] && [ $PATCH != 0 ]; then
+    if [ "$RELEASE_LEVEL" = "minor" ] && [ "$PATCH" != "0" ]; then
       echo "ERROR: a minor release has already been performed in this release branch; only patch releases are allowed here now." >&2
-      exit 11
+      exit 3
     else
       NEXT_RELEASE_BRANCH_VERSION="$MAJOR.$MINOR.1-$RC.0"
     fi
-    if [ $RELEASE_LEVEL = patch ] && [ $PATCH = 0 ]; then
+    if [ "$RELEASE_LEVEL" = "patch" ] && [ "$PATCH" = "0" ]; then
       echo "ERROR: you must release a minor release before releasing a patch in this release branch." >&2
-      exit 12
+      exit 3
     else
       NEXT_RELEASE_BRANCH_VERSION="$MAJOR.$MINOR.$((PATCH+1))-$RC.0"
     fi
 
-    echo "INFO: $RELEASE_LEVEL ok in branch $BRANCH"
+    verbose "INFO: $RELEASE_LEVEL ok in branch $BRANCH"
 
     RELEASE_VERSION="$MAJOR.$MINOR.$PATCH"
 
@@ -375,7 +780,7 @@ case "$RELEASE_LEVEL" in
     exit 0
     ;;
 
-  rc|$RC)
+  $DEFAULT_RC|$RC)
     setVersions $VERSION
 
     applyChanges "release $VERSION" $VERSION
