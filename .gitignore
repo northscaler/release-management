@@ -283,4 +283,4 @@ $RECYCLE.BIN/
 
 # End of https://www.toptal.com/developers/gitignore/api/macos,linux,windows,jetbrains+all,eclipse,code,emacs
 # the above line is passed to gitignore.io; add anything custom below, then execute .gitignore.sh
-*.tmp
+*.this
