@@ -1,19 +1,18 @@
 stages:
   - build
 
-image: docker:20.10.12
+image: docker:dind
 
 variables:
-  DOCKER_HOST: tcp://docker:2375/
   DOCKER_DRIVER: overlay2
-  DOCKER_TLS_CERTDIR: ""
 
 build:
   stage: build
-  image: bitnami/git
+  image: docker:git
   services:
-    - docker:20.10.12-dind
+    - docker:dind
   script:
-    - git config --global user.email "you@example.com"
-    - git config --global user.name "Your Name"
-    - ./test/test-all.sh
+    - git config --global user.email "ci@northscaler.com"
+    - git config --global user.name "Release Management"
+    - apk add bash
+    - bash -c ./test/test-all.sh
