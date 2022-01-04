@@ -1,0 +1,44 @@
+########################################################################################################################
+# This file is an example GitLab CI file used with the release scripts that use the --dev-qa option in order to
+# illustrate not only how the version string is used to match the "only" attribute of each job
+########################################################################################################################
+
+stages:
+  - build
+  - push-artifacts
+  - deploy
+
+build:
+  stage: build
+  script:
+    - echo this job will run on every push
+
+push-some-artifact:
+  stage: push-artifacts
+  dependencies:
+    - build
+  script:
+    - echo "this job will only run on pushed tags that are semver dev, qa or ga releases"
+  only: # on tagged dev, qa or ga releases
+    - /^[0-9]{1,}\.[0-9]{1,}\.[0-9]{1,}(-(dev|qa))\.[0-9]{1,})?$/
+
+dev-deploy:
+  stage: deploy
+  script:
+    - echo "this job will only run on pushed tags that are semver dev releases"
+  only: # on tagged dev releases
+    - /^[0-9]{1,}\.[0-9]{1,}\.[0-9]{1,}-dev\.[0-9]{1,}$/
+
+qa-deploy:
+  stage: deploy
+  script:
+    - echo "this job will only run on pushed tags that are semver qa releases"
+  only: # on tagged qa releases
+    - /^[0-9]{1,}\.[0-9]{1,}\.[0-9]{1,}-qa\.[0-9]{1,}$/
+
+prod-deploy:
+  stage: deploy
+  script:
+    - echo "this job will only run on pushed tags that are semver ga releases"
+  only: # on ga releases with no prerelease suffixes
+    - /^[0-9]{1,}\.[0-9]{1,}\.[0-9]{1,}$/

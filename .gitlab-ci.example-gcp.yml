@@ -1,0 +1,152 @@
+########################################################################################################################
+# This file is an example GitLab CI file used with the release scripts that use the --dev-qa option in order to
+# illustrate not only how the version string is used to match the "only" attribute of each job, but also how you might
+# build a Docker image & publish it to GCP's GCR and build Helm chart based on that image, publish the Helm chart to
+# GCP's GCR, then deploy the Helm chart to GCP's GKE.
+########################################################################################################################
+
+variables:
+  ORGANIZATION: acme
+  PRERELEASE_DOCKER_IMAGE_PREFIX: gcr.io/$ORGANIZATION-dev/
+  RELEASE_DOCKER_IMAGE_PREFIX: gcr.io/$ORGANIZATION-dev/
+  DOCKER_IMAGE_SUFFIX: -image
+  DOCKERFILE: Dockerfile
+  PRERELEASE_DOCKER_USER: $GCP_PRERELEASE_SERVICE_ACCOUNT_JSON_USER
+  PRERELEASE_DOCKER_PASS: "$GCP_PRERELEASE_SERVICE_ACCOUNT_JSON"
+  RELEASE_DOCKER_USER: $GCP_RELEASE_SERVICE_ACCOUNT_JSON_USER
+  RELEASE_DOCKER_PASS: "$GCP_RELEASE_SERVICE_ACCOUNT_JSON"
+  DOCKER_LOGIN_SERVER: https://gcr.io
+  HELM_CHART_SUFFIX: -chart
+  HELM_CHART_DIR: $CI_PROJECT_NAME$HELM_CHART_SUFFIX
+
+stages:
+  - build
+  - push-artifacts
+  - deploy
+
+build:
+  stage: build
+  image: node:16
+  script:
+    - node --version
+    - npm --version
+    - echo "npm ci && npm test"
+
+push-docker-image:
+  stage: push-artifacts
+  image: docker
+  services:
+    - docker:dind
+  variables:
+    DOCKER_DRIVER: overlay2
+  dependencies:
+    - build
+  script:
+    - export DOCKER_IMAGE=$PRERELEASE_DOCKER_IMAGE_PREFIX$CI_PROJECT_NAME$DOCKER_IMAGE_SUFFIX
+    # Replace `+` with `-` to make version string Docker tag compliant
+    - export TRANSFORMED_CI_COMMIT_REF_NAME="$(echo $CI_COMMIT_REF_NAME | tr + -)"
+    - docker build -f $DOCKERFILE -t $DOCKER_IMAGE:$TRANSFORMED_CI_COMMIT_REF_NAME -t $DOCKER_IMAGE:$CI_COMMIT_SHA .
+    - echo -n "$PRERELEASE_DOCKER_PASS" | docker login -u $PRERELEASE_DOCKER_USER --password-stdin $DOCKER_LOGIN_SERVER
+    - docker push $DOCKER_IMAGE:$TRANSFORMED_CI_COMMIT_REF_NAME
+    - docker push $DOCKER_IMAGE:$CI_COMMIT_SHA
+  only: # on tagged dev, qa or ga releases
+    - /^[0-9]{1,}\.[0-9]{1,}\.[0-9]{1,}(-(dev|qa))\.[0-9]{1,})?$/
+
+push-helm-chart:
+  stage: push-artifacts
+  image: northscaler/docker-helm:0.2.2
+  services:
+    - docker:dind
+  script:
+    - export HELM_EXPERIMENTAL_OCI=1
+    - export HELM_CHART="$PRERELEASE_DOCKER_IMAGE_PREFIX$CI_PROJECT_NAME$HELM_CHART_SUFFIX"
+    - echo -n "$PRERELEASE_DOCKER_PASS" | helm registry login -u $PRERELEASE_DOCKER_USER --password-stdin $DOCKER_LOGIN_SERVER
+    # Replace `+` with `-` to make version string Docker tag compliant
+    - export TRANSFORMED_CI_COMMIT_REF_NAME="$(echo $CI_COMMIT_REF_NAME | tr + -)"
+    # Update the version in Chart.yaml in case there is optional semver metadata
+    - |
+      CHART_FILE="organization-chart/Chart.yaml"
+      CHART_CONTENT="$(cat $CHART_FILE)"
+      echo "$CHART_CONTENT" | ymlx "it => { it.version = \"$TRANSFORMED_CI_COMMIT_REF_NAME\"; return it; }" > $CHART_FILE
+      echo "INFO: set 'version' attribute in $CHART_FILE to $TRANSFORMED_CI_COMMIT_REF_NAME"
+      echo "$CHART_FILE is now:"
+      cat "$CHART_FILE"
+    - helm chart save $HELM_CHART_DIR $HELM_CHART:$TRANSFORMED_CI_COMMIT_REF_NAME
+    - helm chart push $HELM_CHART:$TRANSFORMED_CI_COMMIT_REF_NAME
+  only: # on tagged dev, qa or ga releases
+    - /^[0-9]{1,}\.[0-9]{1,}\.[0-9]{1,}(-(dev|qa))\.[0-9]{1,})?$/
+
+dev-deploy:
+  stage: deploy
+  image: northscaler/docker-helm:0.2.2
+  environment:
+    name: $ORGANIZATION-dev
+    kubernetes:
+      namespace: default
+  services:
+    - docker:dind
+  script:
+    - echo -n "$PRERELEASE_DOCKER_PASS" | docker login -u $PRERELEASE_DOCKER_USER --password-stdin $DOCKER_LOGIN_SERVER
+    - export ENV=$ORGANIZATION-dev
+    - export TRANSFORMED_CI_COMMIT_REF_NAME="$(echo $CI_COMMIT_REF_NAME | tr + -)"
+    # Update the version in Chart.yaml in case there is optional semver metadata
+    - |
+      CHART_FILE="organization-chart/Chart.yaml"
+      CHART_CONTENT="$(cat $CHART_FILE)"
+      echo "$CHART_CONTENT" | ymlx "it => { it.version = \"$TRANSFORMED_CI_COMMIT_REF_NAME\"; return it; }" > $CHART_FILE
+      echo "INFO: set 'version' attribute in $CHART_FILE to $TRANSFORMED_CI_COMMIT_REF_NAME"
+      echo "$CHART_FILE is now:"
+      cat "$CHART_FILE"
+    - helm upgrade $CI_PROJECT_NAME ./organization-chart -f ./organization-chart/env/$ENV.values.yaml --kubeconfig=$KUBECONFIG --install --debug --atomic --cleanup-on-fail
+  only: # on tagged dev releases
+    - /^[0-9]{1,}\.[0-9]{1,}\.[0-9]{1,}-dev\.[0-9]{1,}$/
+
+qa-deploy:
+  stage: deploy
+  image: northscaler/docker-helm:0.2.2
+  environment:
+    name: $ORGANIZATION-qa
+    kubernetes:
+      namespace: default
+  services:
+    - docker:dind
+  script:
+    - echo -n "$PRERELEASE_DOCKER_PASS" | docker login -u $PRERELEASE_DOCKER_USER --password-stdin $DOCKER_LOGIN_SERVER
+    - export ENV=$ORGANIZATION-qa
+    - export TRANSFORMED_CI_COMMIT_REF_NAME="$(echo $CI_COMMIT_REF_NAME | tr + -)"
+    # Update the version in Chart.yaml in case there is optional semver metadata
+    - |
+      CHART_FILE="organization-chart/Chart.yaml"
+      CHART_CONTENT="$(cat $CHART_FILE)"
+      echo "$CHART_CONTENT" | ymlx "it => { it.version = \"$TRANSFORMED_CI_COMMIT_REF_NAME\"; return it; }" > $CHART_FILE
+      echo "INFO: set 'version' attribute in $CHART_FILE to $TRANSFORMED_CI_COMMIT_REF_NAME"
+      echo "$CHART_FILE is now:"
+      cat "$CHART_FILE"
+    - helm upgrade $CI_PROJECT_NAME ./organization-chart -f ./organization-chart/env/$ENV.values.yaml --kubeconfig=$KUBECONFIG --install --debug --atomic --cleanup-on-fail
+  only: # on tagged qa releases
+    - /^[0-9]{1,}\.[0-9]{1,}\.[0-9]{1,}-qa\.[0-9]{1,}$/
+
+prod-deploy:
+  stage: deploy
+  image: northscaler/docker-helm:0.2.2
+  environment:
+    name: $ORGANIZATION-prod
+    kubernetes:
+      namespace: default
+  services:
+    - docker:dind
+  script:
+    - echo -n "$PRERELEASE_DOCKER_PASS" | docker login -u $PRERELEASE_DOCKER_USER --password-stdin $DOCKER_LOGIN_SERVER
+    - export ENV=$ORGANIZATION-prod
+    - export TRANSFORMED_CI_COMMIT_REF_NAME="$(echo $CI_COMMIT_REF_NAME | tr + -)"
+    # Update the version in Chart.yaml in case there is optional semver metadata
+    - |
+      CHART_FILE="organization-chart/Chart.yaml"
+      CHART_CONTENT="$(cat $CHART_FILE)"
+      echo "$CHART_CONTENT" | ymlx "it => { it.version = \"$TRANSFORMED_CI_COMMIT_REF_NAME\"; return it; }" > $CHART_FILE
+      echo "INFO: set 'version' attribute in $CHART_FILE to $TRANSFORMED_CI_COMMIT_REF_NAME"
+      echo "$CHART_FILE is now:"
+      cat "$CHART_FILE"
+    - helm upgrade $CI_PROJECT_NAME ./organization-chart -f ./organization-chart/env/$ENV.values.yaml --kubeconfig=$KUBECONFIG --install --debug --atomic --cleanup-on-fail
+  only: # on ga releases (no prerelease suffixes!)
+    - /^[0-9]{1,}\.[0-9]{1,}\.[0-9]{1,}$/

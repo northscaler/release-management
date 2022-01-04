@@ -73,6 +73,13 @@ There are some convenient preset options supported by the `release.sh` script:
     * `pre` for pre prerelease token, and
     * `rc` for the RC prerelease token
 
+This repo includes examples based on GitLab's CI/CD configuration file that illustrate how semver version strings are
+used to build, push artifacts & deploy to different environments. Git branches, semver strings and environments are all
+closely related.
+
+See [this minimal GitLab example file](.gitlab-ci.example-minimal.yml)
+or [this GitLab + GCP/GCR/GKE example](.gitlab-ci.example-gcp.yml) for more information.
+
 ## Workflow
 
 There are basically two key events while preparing for a release:
