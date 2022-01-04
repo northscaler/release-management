@@ -47,7 +47,7 @@
 # Note that a major release is technically the same as a minor release, just that the minor
 # component of the version string is literally "0".
 
-# NB: The 'RM_' prefix stands for "Release Management".
+# NB: The 'RM_' prefix in environment variables below stands for "Release Management".
 
 set -e
 

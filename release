@@ -1,0 +1,31 @@
+#!/usr/bin/env bash
+set -e
+
+# This is a convenient script to retrieve & invoke the Northscaler release script with settings that are appropriate
+# for your repo.  You should copy & edit it as you see fit for your repo, then put it under that repo's source control.
+
+# You should gitignore the files you download using this script, otherwise it'll mess with your git status when releasing.
+
+THIS_ABSPATH="$(cd "$(dirname "$0")"; pwd)"
+
+# try with curl or wget, else fallback to docker
+if which curl; then
+  fetch='curl -s '
+elif which wget; then
+  fetch='wget -qO - '
+else
+  fetch='docker run --rm -i rancher/curl -s '
+fi
+
+RM_VERSION=${RM_VERSION:-dev} # the git ref of the version of the northscaler/release-management file you want to get
+
+get() {
+  $fetch https://gitlab.com/northscaler-public/release-management/-/raw/$RM_VERSION/$1 >"$THIS_ABSPATH/$1" && \
+  chmod +x "$THIS_ABSPATH/$1"
+}
+
+# get any required files from Northscaler's release-management repo
+get release.sh
+
+# Feel free to change this invocation to suit your needs
+"$THIS_ABSPATH/release.sh" --dev-qa $@
