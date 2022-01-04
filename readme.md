@@ -1,3 +1,10 @@
+# Deprecation Notice
+> NOTE: the content in this branch is now frozen and will undergo no further development.
+> All new development will happen in the `dev` branch, however, the `master` branch will continue to be the default branch for backward compatibility.
+> You are encouraged to upgrade to the new releases beginning with 2.x.
+> Please see [the `dev` branch](https://gitlab.com/northscaler-public/release-management/-/tree/dev) for more information.
+> If you're currently using this repo's `master` branch, there is a convenient, backward-compatible option to the new `release.sh` script:  see option `--pre-rc` described via `release.sh --help`.
+
 # Release Management Scripts
 This repository contains bash shell scripts that assist in implementing a release management strategy that is based on one release branch per minor version.
 
