@@ -5,7 +5,7 @@ set -e
 # Typically, you'll have tags called `latest`, `stable-1.0`, `stable-1.1`, ..., `next-1.1`, `next-1.2`, ...
 # Run `npm dist-tag ls @northscaler/string-support` for an example.
 #
-# NB: The 'RM' prefix stands for "Release Management".
+# NB: The 'RM_' prefix stands for "Release Management".
 #
 # This script is intended to run immediately after publishing to npm with a temporary tag with an invocation similar to:
 # $ export RM_TMP_TAG=cicd-$(date +%s)
