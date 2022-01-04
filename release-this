@@ -27,4 +27,4 @@ get() {
 get release.sh
 
 # Feel free to change this invocation to suit your needs
-"$THIS_ABSPATH/release.sh$RM_ANTICOLLISION_SUFFIX" --dev-qa $@
+"$THIS_ABSPATH/release.sh$RM_ANTICOLLISION_SUFFIX" --dev-qa --tech version $@
