@@ -1,13 +1,15 @@
 #!/usr/bin/env bash
-set -e
+set -ex
 
 TEST_TYPE="$1"
 
 THIS_ABSPATH="$(cd "$(dirname "$0")"; pwd)"
+ORIGIN=${ORIGIN:-origin}
+MAIN=${MAIN:-master}
 
 rm -rf "$THIS_ABSPATH/$TEST_TYPE/local"
 cp -r "$THIS_ABSPATH/$TEST_TYPE/local-src" "$THIS_ABSPATH/$TEST_TYPE/local"
-git init "$THIS_ABSPATH/$TEST_TYPE/local"
+git init -b $MAIN "$THIS_ABSPATH/$TEST_TYPE/local"
 
 rm -rf "$THIS_ABSPATH/$TEST_TYPE/remote"
 mkdir -p "$THIS_ABSPATH/$TEST_TYPE/remote"
@@ -21,6 +23,6 @@ fi
   cd "$THIS_ABSPATH/$TEST_TYPE/local"
   git add .
   git commit -m 'begin test'
-  git remote add origin "$REMOTE_PATH"
-  git push -u origin master
+  git remote add $ORIGIN "$REMOTE_PATH"
+  git push -u $ORIGIN $MAIN
 )

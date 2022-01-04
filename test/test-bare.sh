@@ -1,50 +1,57 @@
 #!/usr/bin/env bash
-set -e
+set -ex
 
 TEST_TYPE="$1"
 THIS_ABSPATH="$(cd "$(dirname "$0")"; pwd)"
 
-SCRIPT="${SCRIPT:-release}"
+SCRIPT="${SCRIPT:-release.sh}"
 PREFIX="${PREFIX:-$THIS_ABSPATH/..}"
 
-# set to empty string to disable
-export RELEASE_DEBUG=
+OPTS='--pre-rc --helm-chart-dir release-test-chart'
 
-if [ "$TEST_TYPE" == chart ]; then
-  export CHART_DIR=release-test-chart
-fi
+# TODO: test saddy paths
 
-# TODO: assertions & test saddy paths
+gitLog='git log --pretty=oneline'
+gitLastMsg='git log --pretty="%s"  HEAD^..HEAD'
 
 (
   cd "$THIS_ABSPATH/$TEST_TYPE/local"
 
   echo 'TEST: 1 pre'
-  $PREFIX/$SCRIPT "$TEST_TYPE" pre
+  $PREFIX/$SCRIPT $OPTS --tech "$TEST_TYPE" pre
+  $gitLog
 
   echo 'TEST: 2 rc'
-  $PREFIX/$SCRIPT "$TEST_TYPE" rc
+  $PREFIX/$SCRIPT $OPTS --tech "$TEST_TYPE" rc
+  $gitLog
 
   echo 'TEST: 3 rc'
-  $PREFIX/$SCRIPT "$TEST_TYPE" rc
+  $PREFIX/$SCRIPT $OPTS --tech "$TEST_TYPE" rc
+  $gitLog
 
   echo 'TEST: 4 minor'
-  $PREFIX/$SCRIPT "$TEST_TYPE" minor
+  $PREFIX/$SCRIPT $OPTS --tech "$TEST_TYPE" minor
+  $gitLog
 
   echo 'TEST: 5 rc'
-  $PREFIX/$SCRIPT "$TEST_TYPE" rc
+  $PREFIX/$SCRIPT $OPTS --tech "$TEST_TYPE" rc
+  $gitLog
 
   echo 'TEST: 6 patch'
-  $PREFIX/$SCRIPT "$TEST_TYPE" patch
+  $PREFIX/$SCRIPT $OPTS --tech "$TEST_TYPE" patch
+  $gitLog
 
   echo 'TEST: 7 rc'
-  $PREFIX/$SCRIPT "$TEST_TYPE" rc
+  $PREFIX/$SCRIPT $OPTS --tech "$TEST_TYPE" rc
+  $gitLog
 
   git checkout master
 
   echo 'TEST: 8 pre'
-  $PREFIX/$SCRIPT "$TEST_TYPE" pre
+  $PREFIX/$SCRIPT $OPTS --tech "$TEST_TYPE" pre
+  $gitLog
 
   echo 'TEST: 9 rc'
-  $PREFIX/$SCRIPT "$TEST_TYPE" rc
+  $PREFIX/$SCRIPT $OPTS --tech "$TEST_TYPE" rc
+  $gitLog
 )

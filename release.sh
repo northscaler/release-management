@@ -47,7 +47,7 @@
 # Note that a major release is technically the same as a minor release, just that the minor
 # component of the version string is literally "0".
 
-# NB: The 'RM_' prefix stands for "Release Management".
+# NB: The 'RM_' prefix in environment variables below stands for "Release Management".
 
 set -e
 
@@ -174,7 +174,7 @@ setVersion_gradle() {
 RM_GRADLE_KOTLIN_FILE="${RM_GRADLE_KOTLIN_FILE:-build.gradle.kts}"
 
 getVersion_gradlekts() {
-  cat "$RM_GRADLE_KOTLIN_FILE" | egrep "^version" | $MATCH \'.*\' | sed "s/'//g"
+  cat "$RM_GRADLE_KOTLIN_FILE" | egrep "^version" | egrep -o "['\"].*['\"]" | tr '"' ' ' | tr "'" ' ' | xargs
 }
 
 # usage: setVersion version
@@ -198,7 +198,7 @@ RM_DOCKER_FILE="${RM_DOCKER_FILE:-Dockerfile}"
 RM_DOCKER_VERSION_LABEL="${RM_DOCKER_VERSION_LABEL:-version}"
 
 getVersion_docker() {
-  echo $(egrep '^LABEL' "$RM_DOCKER_FILE" | egrep -o "$RM_DOCKER_VERSION_LABEL=\"?[0-9]+\.[0-9]+\.[0-9]+(-[^ \"]*)?\"?" | cut -d'=' -f2 | sed 's/"//g')
+  echo "$(egrep '^LABEL' "$RM_DOCKER_FILE" | egrep -o "$RM_DOCKER_VERSION_LABEL=\"?[0-9]+\.[0-9]+\.[0-9]+(-[^ \"]*)?\"?" | cut -d'=' -f2 | sed 's/"//g')"
 }
 
 setVersion_docker() {
@@ -219,10 +219,10 @@ setVersion_docker() {
       line="$(echo "$label" | sed -E "s/$RM_DOCKER_VERSION_LABEL=\"?[0-9]+\.[0-9]+\.[0-9]+(-[^ \"]*)?\"?/$RM_DOCKER_VERSION_LABEL=$1/")"
       lines="$lines\n$line"
     fi
-    printf '%s' "$lines" > "$RM_DOCKER_FILE"
+    printf "$lines" > "$RM_DOCKER_FILE"
   done
   lines="$(cat "$RM_DOCKER_FILE")\n"
-  printf '%s' "$lines" > "$RM_DOCKER_FILE"
+  printf "$lines" > "$RM_DOCKER_FILE"
 
   verbose "$RM_DOCKER_FILE is now: $(cat cat "$RM_DOCKER_FILE")"
 }
@@ -256,7 +256,7 @@ setVersion_maven() {
 RM_NODEJS_PACKAGE_JSON="${RM_NODEJS_PACKAGE_JSON:-package.json}"
 RM_NODEJS_PACKAGE_JSON_DIR="$(dirname "$RM_NODEJS_PACKAGE_JSON" | sed -E "s|^\.|$PWD|")"
 
-RM_NODEJS_DOCKER="docker run --rm -i -v '$RM_NODEJS_PACKAGE_JSON_DIR:$RM_NODEJS_PACKAGE_JSON_DIR' -w '$RM_NODEJS_PACKAGE_JSON_DIR' "
+RM_NODEJS_DOCKER="docker run --rm -i -v $RM_NODEJS_PACKAGE_JSON_DIR:$RM_NODEJS_PACKAGE_JSON_DIR -w $RM_NODEJS_PACKAGE_JSON_DIR node"
 RM_NODEJS_NODE=node
 if [ -n "$NO_USE_LOCAL_NODEJS" ] || ! $RM_NODEJS_NODE --version >/dev/null 2>&1; then
   RM_NODEJS_NODE="$RM_NODEJS_DOCKER node"
@@ -303,9 +303,9 @@ setVersion_sbt() {
 #####
 
 #####
-##### begin RM_VERSION file support
+##### begin VERSION file support
 #####
-RM_VERSION_FILE="${RM_VERSION_FILE:-RM_VERSION}"
+RM_VERSION_FILE="${RM_VERSION_FILE:-VERSION}"
 
 getVersion_version() {
   cat "$RM_VERSION_FILE" | xargs
@@ -317,13 +317,13 @@ setVersion_version() {
   verbose "$RM_VERSION_FILE is now: $(cat "$RM_VERSION_FILE")"
 }
 #####
-##### end RM_VERSION file support
+##### end VERSION file support
 #####
 
 usage() {
   echo "This script performs release commits, tags & branching.  Usage:"
 
-  printf "%s --tech tech1,tech2,... [options] $PRE|$RC|minor|patch\n \
+  printf "%s --tech tech1,tech2,... [options] $RM_PRE|$RM_RC|minor|patch\n \
   where options are as follows (last one wins):\n \
   --tech|-t                           # required at least once, the technology types to release (comma-delimited list ok); choose from:\n \
                                       #  'helm' for Helm Chart (Chart.yaml),\n \
@@ -347,9 +347,10 @@ usage() {
   [--git-push-opts|-O opts]           # optional, git commit options, default '%s' ('--no-verify' is common)\n \
   [--pre-release-token|-k token]      # optional, pre release token, default '%s'\n \
   [--rc-release-token|-K token]       # optional, release candidate release token, default '%s'\n \
-  [--dev-qa]                          # optional, shortcut for '--pre-release-token dev --rc-release-token qa'\n \
-  [--alpha-beta]                      # optional, shortcut for '--pre-release-token alpha --rc-release-token beta'\n \
-  [--pre-rc]                          # optional, shortcut for '--pre-release-token pre --rc-release-token rc' (legacy behavior)\n \
+  [--dev-qa]                          # optional, shortcut for '--main dev --pre-release-token dev --rc-release-token qa'\n \
+  [--trunk-qa]                        # optional, shortcut for '--main trunk --pre-release-token trunk --rc-release-token qa'\n \
+  [--alpha-beta]                      # optional, shortcut for '--main alpha --pre-release-token alpha --rc-release-token beta'\n \
+  [--pre-rc]                          # optional, shortcut for '--main master --pre-release-token pre --rc-release-token rc' (legacy behavior)\n \
   [--helm-chart-dir chartDir]         # optional, chart directory, default cwd ('%s')\n \
   [--helm-chart-file chartFile]       # optional, chart filename, default '%s'\n \
   [--csharp-file csharpFile]          # optional, csharp filename, default '%s'\n \
@@ -436,69 +437,88 @@ while [ $# -gt 0 ]; do
     shift
     ;;
   --dev-qa)
-    RM_PRE=dev
-    RM_RC=qa
     shift
+    RM_MAIN=dev
+    RM_PRE=$RM_MAIN
+    RM_RC=qa
+    ;;
+  --trunk-qa)
+    shift
+    RM_MAIN=trunk
+    RM_PRE=$RM_MAIN
+    RM_RC=qa
     ;;
   --alpha-beta)
-    RM_PRE=alpha
-    RM_RC=beta
     shift
+    RM_MAIN=alpha
+    RM_PRE=$RM_MAIN
+    RM_RC=beta
     ;;
   --pre-rc)
+    shift
+    RM_MAIN=master
     RM_PRE=pre
     RM_RC=rc
-    shift
     ;;
   --verbose | -v)
-    RM_VERBOSE=1
     shift
+    RM_VERBOSE=1
     ;;
   --cherry-pick-to-main)
-    RM_CHERRY_PICK_RELEASE_COMMIT_TO_MAIN=1
     shift
+    RM_CHERRY_PICK_RELEASE_COMMIT_TO_MAIN=1
     ;;
   --no-cherry-pick-to-main)
-    RM_CHERRY_PICK_RELEASE_COMMIT_TO_MAIN=
     shift
+    RM_CHERRY_PICK_RELEASE_COMMIT_TO_MAIN=
     ;;
   --helm-chart-dir)
+    shift
     RM_HELM_CHART_DIR="$1"
     shift
     ;;
   --helm-chart-file)
+    shift
     RM_HELM_CHART_FILE="$1"
     shift
     ;;
   --csharp-file)
+    shift
     RM_CSHARP_FILE="$1"
     shift
     ;;
   --gradle-file)
+    shift
     RM_GRADLE_FILE="$1"
     shift
     ;;
   --gradlekts-file)
+    shift
     RM_GRADLE_KOTLIN_FILE="$1"
     shift
     ;;
   --docker-file)
+    shift
     RM_DOCKER_FILE="$1"
     shift
     ;;
   --docker-file-version-label)
+    shift
     RM_DOCKER_VERSION_LABEL="$1"
     shift
     ;;
   --maven-file)
+    shift
     RM_MAVEN_FILE="$1"
     shift
     ;;
   --scala-file)
+    shift
     RM_SCALA_SBT_FILE="$1"
     shift
     ;;
   --nodejs-file)
+    shift
     RM_NODEJS_PACKAGE_JSON="$1"
     RM_NODEJS_PACKAGE_JSON_DIR="$(dirname "$RM_NODEJS_PACKAGE_JSON" | sed -E "s|^\.|$PWD|")"
     shift
@@ -575,6 +595,7 @@ for T in $RM_TECHNOLOGIES; do
   V_LAST="$V"
   T_LAST="$T"
 done
+RM_VERSION="$V_LAST"
 
 if ! git diff --exit-code --no-patch; then
   echo 'ERROR: you have modified tracked files; only release from clean directories!' >&2
@@ -635,8 +656,6 @@ else # this is a release branch
 fi
 
 verbose "INFO: ok to proceed with $RM_RELEASE_LEVEL from branch $RM_BRANCH"
-
-RM_VERSION="$V_LAST"
 
 if ! $MATCH "\-($RM_PRE|$RM_RC)\.[0-9]{1,}$" "$RM_VERSION"; then
   echo "ERROR: repository is in an inconsistent state: current version '$RM_VERSION' does not end in a prerelease suffix '$RM_PRE' or '$RM_RC'! You are currently on branch '$RM_BRANCH'." >&2
@@ -702,7 +721,7 @@ if [ "$RM_BRANCH" == "$RM_MAIN" ]; then # this will be either an rc release resu
       git checkout $RM_MAIN
       verbose "INFO: checked out '$RM_MAIN'"
 
-      if [ -n "$RM_CHERRY_PICK_TO_MAIN" ]; then
+      if [ -n "$RM_CHERRY_PICK_RELEASE_COMMIT_TO_MAIN" ]; then
         git cherry-pick -x $RM_NEW_RELEASE_BRANCH # cherry pick from release branch to get release candidate commit in master
         verbose "INFO: cherry-picked '$RM_NEW_RELEASE_BRANCH' '$RM_RC' commit into '$RM_MAIN'"
       fi

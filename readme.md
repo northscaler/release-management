@@ -1,189 +1,160 @@
 # Release Management Scripts
-This repository contains bash shell scripts that assist in implementing a release management strategy that is based on one release branch per minor version.
 
-In this strategy, the `master` branch contains the latest & greatest code, and branches are created for each minor version (`vx.y`) and only patches for that release go into its minor branch.
+This repository contains a Bash shell script, `release.sh`, that assists in implementing a release management strategy
+that is based on one release branch per minor version. Docker is currently a requirement, too.
 
-## TL;DR
-```sh
-$ git clone git@github.com:northscaler-public/release-management.git /tmp/northscaler/release-management
-$ alias release=/tmp/northscaler/release-management/release
-$
-$ # For a Node.js project using npm:
-$ release nodejs pre   # release a preview
-$ release nodejs rc    # release a release candidate
-$ release nodejs minor # release a minor version
-$ release nodejs patch # release a patch
-$
-$ # For a Node.js project using npm that also produces a Docker image,
-$ # and you want the package version to be the same as the Docker image's
-$ # version label:
-$ release nodejs+image pre   # release a preview
-$ release nodejs+image rc    # release a release candidate
-$ release nodejs+image minor # release a minor version
-$ release nodejs+image patch # release a patch
-$
-$ # For a Helm chart project:
-$ release chart pre   # release a preview
-$ release chart rc    # release a release candidate
-$ release chart minor # release a minor version
-$ release chart patch # release a patch
-$
-$ # For a generic project that uses a VERSION file:
-$ release version pre   # release a preview
-$ release version rc    # release a release candidate
-$ release version minor # release a minor version
-$ release version patch # release a patch
-$
-$ # For a .NET project in c# that uses an AssemblyInfo.cs file with entries for AssemblyVersion, AssemblyFileVersion and AssemblyInformationalVersion:
-$ release csharp pre   # release a preview
-$ release csharp rc    # release a release candidate
-$ release csharp minor # release a minor version
-$ release csharp patch # release a patch
-$
-$ # For a maven project that uses a pom.xml:
-$ release mavenpomxml pre   # release a preview
-$ release mavenpomxml rc    # release a release candidate
-$ release mavenpomxml minor # release a minor version
-$ release mavenpomxml patch # release a patch
-$
-$ # For a project that uses a build.gradle.kts file:
-$ release gradle pre   # release a preview
-$ release gradle rc    # release a release candidate
-$ release gradle minor # release a minor version
-$ release gradle patch # release a patch
-$
-$ # For a project that uses a build.sbt file:
-$ release sbt pre   # release a preview
-$ release sbt rc    # release a release candidate
-$ release sbt minor # release a minor version
-$ release sbt patch # release a patch
-$
-$ # To use the Docker image to release a Node.js preview:
-$ docker run \
-    --rm \
-    -it \
-    -e EMAIL=your@email.here \
-    -v ~/.ssh/id_rsa:/root/.ssh/id_rsa \
-    -v ~/.ssh/id_rsa.pub:/root/.ssh/id_rsa.pub \
-    -v $PWD:/gitrepo \
-    northscaler/release \
-    nodejs pre
-```
-This is a minor-release-per-branch strategy, and all that the scripts do is manipulate versions, create release commits & tags, create release branches, and push so that your CI/CD process can actually perform releases based on branch & tag names.
-You can override certain defaults; see the `release-xxx` scripts for more information.
+In this strategy, the main branch (`main`, by default) contains the latest & greatest code, and branches are created for
+each minor version (`vx.y`, for example `v2.4`), including all of its patches.
 
-We currently support release management for
-* Helm charts (`release-chart`)
-* Docker images using `Dockerfile`'s `LABEL` directive with a `version=` label (`release-image`)
-* Node.js projects (`release-nodejs`) using `npm` along with `package.json` (`yarn` is a TODO)
+> NOTE: The version number at rest in your repository is _almost always_ at a prerelease level, except for the short amount of time during releases where prerelease suffixes are dropped and release commits and tags are created.
+
+## Overview of the minor-release-per-branch strategy
+
+This is a minor-release-per-branch strategy, and all that the script does is
+
+* manipulate version strings,
+* create release commits & tags, *
+* create release branches, and
+* push ot the git remote
+
+so that your CI/CD process can actually perform releases based on branch & tag names as commits are pushed to your git
+remotes.
+
+We currently support release management for various technologies:
+
+* Helm charts
+* Docker images using `Dockerfile`'s `LABEL` directive with a `version=` label
+* Node.js projects using `npm` along with `package.json` (`yarn` is a TODO)
 * Projects that use a plain-text `VERSION` file (by any name)
 * .NET projects in C# that use an `AssemblyInfo.cs` file
 * Maven projects that use a `pom.xml` file
-* Projects that use a `build.gradle` file
-* Projects that use a `build.gradle.kts` file
+* Gradle projects that use a `build.gradle` file
+* Kotlin Gradle projects that use a `build.gradle.kts` file
 * Scala projects that use a `build.sbt` file
 
 If you need to support other project types, see below for developer information.
 
-## Overview
 * The only supported source control system is [git](https://git-scm.com/).
 * Version numbers are based on [Semantic Versioning](https://semver.org).
-* The main branch, `master` by default for backward compatbility reasons, is assumed to always contain the latest & greatest _completed_ features and should be releasable at any time.
-  The name of this branch is configurable via the `MASTER` environment variable.
-* The default prerelease suffix in `master` is `pre` (ie, `1.0.0-pre.0`), and is configurable by setting the `PRE` environment variable.  We recommend overriding it and using the same name as your primary branch, ensuring that the name sorts alphabetically before your release candidate prerelease suffix (see next bullet point).  On new projects, we recommend using `dev` for your main branch name & your prerelease suffix (and your development cloud environment, if you have one).
-* The default prerelease suffix in release branches is `rc` for "release candidate" (ie, `1.0.0-rc.0`), and is configurable via the `RC` environment variable.  We recommend overriding it and naming it the same as the name of your QA testing environment, provided that it sorts alphabetically after your main branch's prerelease suffix (see prior bullet point).  On new projects, we recommend using `qa` and naming your QA testing environment `qa`.
-* The name of the git remote is assumed to be `origin`, but is configurable via the `ORIGIN` environment variable.
-* The version number at rest in your repository is _almost always_ at a prerelease level, except for the short amount of time during releases where prerelease suffixes are dropped.
+* The main branch, `main` by default, is assumed to always contain the latest & greatest _completed_ features and should
+  be releasable at any time. Features _still in progress_ should be developed in feature branches. The name of this
+  branch is configurable via the `--main` option, and _must_ sort alphabetically before your release candidate suffix.
+* The default prerelease suffix in the main branch is the same as the main branch name (ie, `1.0.0-main.0`), and is
+  configurable by setting the `--pre-release-token` option.
+* The default prerelease suffix in release branches is `rc` for "release candidate" (ie, `1.0.0-rc.0`), and is
+  configurable via the `--rc-release-token` option. This value _must_ sort alphabetically after the value of
+  the `--pre-release-token` option.
+* The name of the git remote is assumed to be `origin`, but is configurable via the `--origin` option.
+
+See also the [release workflow diagram](release-workflow.jpg) ([pdf](release-workflow.pdf)) or
+its [Apple Keynote](https://www.apple.com/keynote/) [source](release-workflow.key).
+
+## Note about deployables
+
+It's convenient to align the names of your deployment environments with your branches & prerelease suffixes as much as
+possible. For example, if you have a development cloud environment called `dev` that you deploy to continuously, you
+should use `dev` for your main branch name & `dev` for your pre release token. Next, if you have a QA test envronment
+that you deploy to for testing completed features as part of a release train, you should use `qa` for your RC release
+token. This way, it is clear which prereleases of components & deployables should go into which environments.
+
+There are some convenient preset options supported by the `release.sh` script:
+
+* `--dev-qa`:  uses
+    * `dev` for both the main branch name & pre prerelease token, and
+    * `qa` for the RC prerelease token
+* `--trunk-qa`:  uses
+    * `trunk` for both the main branch name & pre prerelease token, and
+    * `qa` for the RC prerelease token
+* `--alpha-beta`:  uses
+    * `alpha` for both the main branch name & pre prerelease token, and
+    * `beta` for the RC prerelease token
+* `--pre-rc`:  (legacy behavior) uses
+    * `master` for the main branch name,
+    * `pre` for pre prerelease token, and
+    * `rc` for the RC prerelease token
 
 ## Workflow
 
 There are basically two key events while preparing for a release:
-* Deciding that you're feature complete for the next release
-* Deciding that you're bug-free enough to release
+
+* Deciding that you're feature complete for the next release.
+* Deciding that you're bug-free enough to release.
 
 The following is a detailed description of the workflow.
 
-> NOTE: In the following description, we'll assume a Node.js project that produces a built application and a Docker image & a Helm chart containing that built application that's ready for deployment.
-We'll also use `dev` for the main branch name and development prerelease suffix, and we'll use `qa` for our release candidate prerelease suffix.
+> NOTE: In the following description, we'll assume a Node.js project that produces a built server-side application, a Docker image & a Helm chart containing the application that's ready for deployment. We'll also use `dev` for the main branch name and development prerelease suffix, and we'll use `qa` for our release candidate prerelease suffix.
 
 * Create your codebase & place it under source control with `git`.
 * Set your version to its initial value in the main branch.
-  * For brand new projects, we recommend starting with `0.1.0-dev.0`.
-  * For existing projects, start with a major version greater than `0`, like `1.0.0-dev.0` or whatever you need.
-  * _New features should be developed in feature branches off of the main branch and only merged back to the main branch when they're considered complete._
-* When you're ready to do your first development preview release, prerelease from your main branch with the command `PRE=dev ./release nodejs+image+chart dev`.
-  * This will create tags & commits for your `dev` prerelease & push them, whereupon your CI/CD pipeline should kick in and actually perform your release workflow.  This is independent of your CI/CD provider and is left to you.
-* When you're _feature complete_, but not necessarily _bug-free_, you can create your minor release branch with an initial release candidate from the main branch with `RC=qa ./release nodejs+image+chart qa`.
-  * This will create a release branch in the format `vx.y` where `x` is your main branch's current major version and `y` is its minor version.
-    The initial version in the `vx.y` branch will be `x.y.0-qa.0`, which will be released, then it will be immediately bumped to `x.y.0-qa.1` in preparation for your next release candidate.
-  * _Important:  Only bug fixes (AKA "patches") should ever be committed in release branches._
-  * As you fix bugs in your release branch that arise from QA testing, make sure to assess whether they need to be backported to your main branch, which will almost always be true.
-    `git cherry-pick -x` is a simple command with which to do that and works most of the time.  Make sure to check its [documentation](https://git-scm.com/docs/git-cherry-pick).
-* When you're _sufficiently bug-free_ in your release branch to release to production (often called a "GA", or "generally available" release), as agreed upon by your stakeholders (the development team, QA team, and customers or customer advocates), you can perform a minor release in that branch with `./release nodejs+image+chart minor`.
-  * This will result in release `vx.y.0`, and the script will bump your prerelease number in the release branch to `x.y.1-qa.0`, where `x` & `y` are your major & minor version numbers, respectively.
-  * You can then indefinitely fix bugs & release patched release candidates via `./release nodejs+image+chart qa` or release GA (general availability) releases via `./release nodejs+image+chart patch`.
-* In parallel after you've cut a release branch, you can continue doing work in `master` for your next minor release, `vx.z` where `z` is `y + 1`.
+    * For brand new projects, we recommend starting with `0.1.0-dev.0`.
+    * For existing projects, start with a major version greater than `0`, like `1.0.0-dev.0` or whatever you need.
+    * _New features should be developed in feature branches off of the main branch and only merged back to the main
+      branch when they're considered complete._
+* When you're ready to do your first development preview release, prerelease from your main branch with the
+  command `PRE=dev ./release nodejs+image+chart dev`.
+    * This will create tags & commits for your `dev` prerelease & push them, whereupon your CI/CD pipeline should kick
+      in and actually perform your release workflow. This is independent of your CI/CD provider and is left to you.
+* When you're _feature complete_, but not necessarily _bug-free_, you can create your minor release branch with an
+  initial release candidate from the main branch with `RC=qa ./release nodejs+image+chart qa`.
+    * This will create a release branch in the format `vx.y` where `x` is your main branch's current major version
+      and `y` is its minor version. The initial version in the `vx.y` branch will be `x.y.0-qa.0`, which will be
+      released, then it will be immediately bumped to `x.y.0-qa.1` in preparation for your next release candidate.
+    * _Important:  Only bug fixes (AKA "patches") should ever be committed in release branches._
+    * As you fix bugs in your release branch that arise from QA testing, make sure to assess whether they need to be
+      backported to your main branch, which will almost always be true.
+      `git cherry-pick -x` is a simple command with which to do that and works most of the time. Make sure to check
+      its [documentation](https://git-scm.com/docs/git-cherry-pick).
+* When you're _sufficiently bug-free_ in your release branch to release to production (often called a "GA", or "
+  generally available" release), as agreed upon by your stakeholders (the development team, QA team, and customers or
+  customer advocates), you can perform a minor release in that branch with `./release nodejs+image+chart minor`.
+    * This will result in release `vx.y.0`, and the script will bump your prerelease number in the release branch
+      to `x.y.1-qa.0`, where `x` & `y` are your major & minor version numbers, respectively.
+    * You can then indefinitely fix bugs & release patched release candidates via `./release nodejs+image+chart qa` or
+      release GA (general availability) releases via `./release nodejs+image+chart patch`.
+* In parallel after you've cut a release branch, you can continue doing work in `master` for your next minor
+  release, `vx.z` where `z` is `y + 1`.
 
 ## Running Natively
-You need to have `bash` with `git` & `docker` installed in order to run the scripts natively.
-You'll also need the technology-specific tools, like `npm` if you're using `nodejs`.
 
-## Running via Docker
-You can also forgo all dependencies except `docker` and use this strategy via its Docker containers, as these scripts have been Dockerized under the `northscaler` organization on [Docker Hub](https://hub.docker.com).
-For example, see https://hub.docker.com/r/northscaler/release.
+You need to have `bash` with `git` & `docker` installed in order to run the scripts natively. You'll also need the
+technology-specific tools, like `npm` if you're using `nodejs`.
 
-All you really have to do is map a volume containing the root of your git repo to `/gitrepo` and set the `EMAIL` environment variable.
-You might also want to include other environment variables supported by git; see https://git-scm.com/book/en/v2/Git-Internals-Environment-Variables.
-If your current directory _is_ the root of your git repo:
-```
-$ docker run --rm -i -v "$PWD:/gitrepo" -e EMAIL=you@example.com northscaler/release xxx pre # or rc, minor, patch, ...
-```
-Just replace `xxx` above with `image`, `chart`, `nodejs`, `version`, any combination thereof (separated by `+`, like `nodejs+image`) or whatever else we support in the future.
+### Prerequisites to running on Windows
 
-## For Developers of This Module
-* This project Eats Its Own Dog Food™.
-  It uses a plain text `VERSION` file to store its version.
-  Use the script `./rel <level>` to release it, where `<level>` is `pre`, `rc`, `minor`, `patch`, or `major`.
-* `./release` is basically an abstract function that implements the release workflow, but needs `getVersion`, `setVersion` and `usage_xxx` functions to exist at runtime for the particular technology being used.
-  `./release` looks for a file called `./release-$1` (where `$1` is the value of the first argument given) & sources it, which provides said functions.
-  Valid values for `$1`, initially, are
-  * `chart` for Helm Charts,
-  * `image` for Docker images,
-  * `nodejs` for Node.js projects using `npm`,
-  * `csharp` for Node.js projects using C#,
-  * `mavenpomxml` for maven projects that use a `pom.xml` file,
-  * `gradle` for projects that use a `build.gradle` file,
-  * `sbt` for projects that use a `build.sbt` file, and
-  * `version` for projects that use a simple text file called `VERSION`.
+* Project requires Hyper-v, Docker and WSL (Windows Subsystem for Linux).
+* Hyper-v can be added to Windows through Control Panel -> Programs and Features -> Turn Windows features on or off. If
+  Hyper-v isn't an option you may need to upgrade your version of Windows.
+* Install Docker for Windows and choose the option of using Windows containers (default is linux). After docker is
+  installed check the box in Settings -> General -> Expose daemon on tcp://localhost:2375 without TSL.
+* To install WSL open a powershell as admin and
+  type `Enable-WindowsOptionalFeature -Online -FeatureName Microsoft-Windows-Subsystem-Linux`.
+* After WSL is installed use the Windows Store to install a distro of linux (Ubuntu recommend). If not installing Ubuntu
+  you will need to adjust the url to get the PGP Key below.
+* After your distro is installed open bash and run the following commands:
+    * `sudo apt-get update -y`
+    * `sudo apt-get install -y apt-transport-https ca-certificates curl software-properties-common`
+    * `curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo apt-key add -`
+    * `sudo add-apt-repository "deb [arch=amd64] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable"`
+    * `sudo apt-get update -y`
+    * `sudo apt-get install -y docker-ce`
+    * `sudo usermod -aG docker $USER`
+    * `sudo apt-get install -y docker-compose`
+    * `sudo mkdir /c` adjust for your drive where docker is installed. ignore if directory already exists.
+    * `sudo mount --bind /mnt/c /c`
+* Lastly, check that everything is running correctly.
+    * `docker info`
+    * `docker-compose --version`
+
+## For contributors
+
+* This project Eats Its Own Dog Food™. It uses a plain text `VERSION` file to store its version. Use the
+  script `./release-this`. It uses the preset `--dev-qa` as of this writing.
+* `release.sh` implements the release workflow, but needs `getVersion_xxx` & `setVersion_xxx` functions for eah
+  particular technology. They are all located in the `release.sh` file.
 
 * Tests are in `test/`
-  * Run `test/test-all.sh`
-  * There needs to be (more) assertions in the tests, and we need better saddy path coverage.
+    * Run `test/test-all.sh`
+    * There needs to be (more) assertions in the tests, and we need better saddy path coverage.
 * To add a technology, copy & paste an existing one:
-  * Look for a `release-xxx` script & a `test/xxx` directory from an existing release technology `xxx`, then remember to
-  * update `test/test-all.sh` to add your new type to those tested
-* To release this release script:
-  * `./rel level` where `level` is the release level (`pre`, `rc`, ...)
-
-> NOTE: this repo now releases all technologies together under a single release, and the prior Docker images should be considered deprecated.
-
-## Running on Windows Prerequisits
-* Project requires Hyper-v, Docker and WSL (Windows Subsystem for Linux).
-* Hyper-v can be added to Windows through Control Panel -> Programs and Features -> Turn Windows features on or off. If Hyper-v isn't an option you may need to upgrade your version of Windows.
-* Install Docker for Windows and choose the option of using Windows containers (default is linux). After docker is installed check the box in Settings -> General -> Expose daemon on tcp://localhost:2375 without TSL.
-* To install WSL open a powershell as admin and type `Enable-WindowsOptionalFeature -Online -FeatureName Microsoft-Windows-Subsystem-Linux`.
-* After WSL is installed use the Windows Store to install a distro of linux (Ubuntu recommend). If not installing Ubuntu you will need to adjust the url to get the PGP Key below.
-* After your distro is installed open bash and run the following commands:
-  * `sudo apt-get update -y`
-  * `sudo apt-get install -y apt-transport-https ca-certificates curl software-properties-common`
-  * `curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo apt-key add -`
-  * `sudo add-apt-repository "deb [arch=amd64] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable"`
-  * `sudo apt-get update -y`
-  * `sudo apt-get install -y docker-ce`
-  * `sudo usermod -aG docker $USER`
-  * `sudo apt-get install -y docker-compose`
-  * `sudo mkdir /c` adjust for your drive where docker is installed. ignore if directory already exists.
-  * `sudo mount --bind /mnt/c /c`
-* Lastly, check that everything is running correctly.
-  * `docker info`
-  * `docker-compose --version`
+    * Copy an existing technology-specific section in `release.sh` (near the top) & massage to fit the new technology.
+    * Update `test/test-all.sh` to add your new type to those tested.
