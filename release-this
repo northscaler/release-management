@@ -20,7 +20,7 @@ RM_VERSION=${RM_VERSION:-dev} # the git ref of the version of the release-manage
 RM_ANTICOLLISION_SUFFIX=.this
 
 get() {
-  $fetch https://gitlab.com/northscaler-public/release-management/-/raw/$RM_VERSION/$1$RM_ANTICOLLISION_SUFFIX > "$THIS_ABSPATH/$1$RM_ANTICOLLISION_SUFFIX" && \
+  $fetch https://gitlab.com/northscaler-public/release-management/-/raw/$RM_VERSION/$1 > "$THIS_ABSPATH/$1$RM_ANTICOLLISION_SUFFIX" && \
   chmod +x "$THIS_ABSPATH/$1$RM_ANTICOLLISION_SUFFIX"
 }
 
