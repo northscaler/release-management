@@ -24,6 +24,16 @@
 
 # This script implements the minor-release-per-branch workflow projects using git for source control.
 
+echo "" >&2
+echo "#########################################################################" >&2
+echo "WARNING: this script is deprecated as of 2022-01-04." >&2
+echo "You are encouraged to move to version 2.x or later of release-management." >&2
+echo "See the new primary branch 'dev' at" >&2
+echo "https://gitlab.com/northscaler-public/release-management/-/tree/dev" >&2
+echo "for more information." >&2
+echo "#########################################################################" >&2
+echo "" >&2
+
 if [ -n "$RELEASE_DEBUG" ]; then
   set -x
 fi
