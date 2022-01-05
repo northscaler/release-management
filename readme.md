@@ -8,6 +8,11 @@ each minor version (`vx.y`, for example `v2.4`), including all of its patches.
 
 > NOTE: The version number at rest in your repository is _almost always_ at a prerelease level, except for the short amount of time during releases where prerelease suffixes are dropped and release commits and tags are created.
 
+## Breaking changes prior to 2.x
+
+There are breaking changes since versions prior to 2.x. To migrate from `release-management` _prior_ to version 2.x, see
+the [migration guide](migrating-from-pre-2.x.md).
+
 ## Overview of the minor-release-per-branch strategy
 
 This is a minor-release-per-branch strategy, and all that the script does is
@@ -18,7 +23,19 @@ This is a minor-release-per-branch strategy, and all that the script does is
 * push ot the git remote
 
 so that your CI/CD process can actually perform releases based on branch & tag names as commits are pushed to your git
-remotes.
+remotes. It does this in a low-tech manner, by using text processing tools (`sed`, `awk` & the usual suspects) to
+manipulate files containing version strings.
+
+### Prerequisites
+
+These are the current prerequisites:
+
+* `git` configured properly for local operation and access to any git remotes,
+* `bash` (until we update to be portable across more shells),
+* `docker`, so that you don't have to install tools that we depend on, and
+* whichever technology-specific utilities (`node`, `npm`, `gradle`, etc) that you depend on.
+
+### Supported project technologies
 
 We currently support release management for various technologies:
 
@@ -46,9 +63,6 @@ If you need to support other project types, see below for developer information.
   the `--pre-release-token` option.
 * The name of the git remote is assumed to be `origin`, but is configurable via the `--origin` option.
 
-See also the [release workflow diagram](release-workflow.jpg) ([pdf](release-workflow.pdf)) or
-its [Apple Keynote](https://www.apple.com/keynote/) [source](release-workflow.key).
-
 ## Note about deployables
 
 It's convenient to align the names of your deployment environments with your branches & prerelease suffixes as much as
@@ -68,17 +82,33 @@ There are some convenient preset options supported by the `release.sh` script:
 * `--alpha-beta`:  uses
     * `alpha` for both the main branch name & pre prerelease token, and
     * `beta` for the RC prerelease token
-* `--pre-rc`:  (legacy behavior) uses
+* `--pre-rc`:  (closest to pre-2.x behavior) uses
     * `master` for the main branch name,
     * `pre` for pre prerelease token, and
     * `rc` for the RC prerelease token
 
-This repo includes examples based on GitLab's CI/CD configuration file that illustrate how semver version strings are
-used to build, push artifacts & deploy to different environments. Git branches, semver strings and environments are all
-closely related.
+## Helpful features
+
+### _Your_ `release` script
+
+Since you will likely customize your release management process, git repos & environments, we have provided a
+basic [release.example](release.example) script for you to include in the repos that you use `release-management` in.
+One convenient thing it does is to automatically download the version of [`release.sh`](release.sh) that you depend on,
+so you should make sure to gitignore `release.sh` (plus, it would dork with your actual release if you didn't gitignore
+it).
+
+Copy [release.example](release.example) to your local repo, make it executable (`chmod +x ...` or similar), and modify
+it to suit your needs. You should commit your copy of [release.example](release.example) along with the rest of your
+repo contents.
+
+### CI/CD integration
+
+Git branches, semver strings and environments are all closely related. To illustrate, this repo includes examples based
+on GitLab's CI/CD configuration file that illustrate how semver version strings are used to build, push artifacts &
+deploy to different environments. Similar concepts apply to other CI/CD providers.
 
 See [this minimal GitLab example file](.gitlab-ci.example-minimal.yml)
-or [this GitLab + GCP/GCR/GKE example](.gitlab-ci.example-gcp.yml) for more information.
+or [this GitLab & GCP/GCR/GKE example](.gitlab-ci.example-gcp.yml) for more information.
 
 ## Workflow
 
@@ -91,18 +121,20 @@ The following is a detailed description of the workflow.
 
 > NOTE: In the following description, we'll assume a Node.js project that produces a built server-side application, a Docker image & a Helm chart containing the application that's ready for deployment. We'll also use `dev` for the main branch name and development prerelease suffix, and we'll use `qa` for our release candidate prerelease suffix.
 
-* Create your codebase & place it under source control with `git`.
+* Create your codebase & place it under source control with `git` with a main/default branch name of `dev`.
 * Set your version to its initial value in the main branch.
     * For brand new projects, we recommend starting with `0.1.0-dev.0`.
-    * For existing projects, start with a major version greater than `0`, like `1.0.0-dev.0` or whatever you need.
+    * For existing projects, start with a minor version greater than the last minor version, like `0.2.0-dev.0` or
+      whatever you need.
     * _New features should be developed in feature branches off of the main branch and only merged back to the main
       branch when they're considered complete._
 * When you're ready to do your first development preview release, prerelease from your main branch with the
-  command `PRE=dev ./release nodejs+image+chart dev`.
+  command `./release.sh --tech nodejs,docker,helm --dev--qa dev`.
     * This will create tags & commits for your `dev` prerelease & push them, whereupon your CI/CD pipeline should kick
-      in and actually perform your release workflow. This is independent of your CI/CD provider and is left to you.
-* When you're _feature complete_, but not necessarily _bug-free_, you can create your minor release branch with an
-  initial release candidate from the main branch with `RC=qa ./release nodejs+image+chart qa`.
+      in and actually perform your release workflow. This is dependent on your CI/CD provider and is left to you.
+* When you've decided that you're _feature complete_, but not necessarily _bug-free_, you can create your next minor
+  release branch with an initial release candidate from the main branch
+  with `./release.sh --tech nodejs,docker,helm --dev--qa qa`.
     * This will create a release branch in the format `vx.y` where `x` is your main branch's current major version
       and `y` is its minor version. The initial version in the `vx.y` branch will be `x.y.0-qa.0`, which will be
       released, then it will be immediately bumped to `x.y.0-qa.1` in preparation for your next release candidate.
@@ -111,20 +143,20 @@ The following is a detailed description of the workflow.
       backported to your main branch, which will almost always be true.
       `git cherry-pick -x` is a simple command with which to do that and works most of the time. Make sure to check
       its [documentation](https://git-scm.com/docs/git-cherry-pick).
-* When you're _sufficiently bug-free_ in your release branch to release to production (often called a "GA", or "
-  generally available" release), as agreed upon by your stakeholders (the development team, QA team, and customers or
-  customer advocates), you can perform a minor release in that branch with `./release nodejs+image+chart minor`.
-    * This will result in release `vx.y.0`, and the script will bump your prerelease number in the release branch
-      to `x.y.1-qa.0`, where `x` & `y` are your major & minor version numbers, respectively.
-    * You can then indefinitely fix bugs & release patched release candidates via `./release nodejs+image+chart qa` or
-      release GA (general availability) releases via `./release nodejs+image+chart patch`.
-* In parallel after you've cut a release branch, you can continue doing work in `master` for your next minor
+* When you've decided that you're _sufficiently bug-free_ in your minor release branch to release to staging and/or
+  production (often called a "GA", or "generally available" release), as agreed upon by your stakeholders (the
+  development team, QA team, customers, customer advocates, etc), you can perform a minor release in that branch
+  with `./release.sh --tech nodejs,docker,helm --dev--qa minor`.
+    * This will result in a release commit with tag `vx.y.0`, and the script will bump your prerelease number in the
+      release branch to `x.y.1-qa.0`, where `x` & `y` are your major & minor version numbers, respectively.
+    * You can then indefinitely fix bugs & release patched release candidates
+      via `./release.sh --tech nodejs,docker,helm --dev--qa qa` or release patched GA (general availability) releases
+      via `./release.sh --tech nodejs,docker,helm --dev--qa patch`.
+* In parallel after you've cut a minor release branch, you can continue doing work in `master` for your next minor
   release, `vx.z` where `z` is `y + 1`.
 
-## Running Natively
-
-You need to have `bash` with `git` & `docker` installed in order to run the scripts natively. You'll also need the
-technology-specific tools, like `npm` if you're using `nodejs`.
+See also the [release workflow diagram](release-workflow.jpg) ([pdf](release-workflow.pdf)) or
+its [Apple Keynote](https://www.apple.com/keynote/) [source](release-workflow.key).
 
 ### Prerequisites to running on Windows
 

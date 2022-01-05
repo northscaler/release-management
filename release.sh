@@ -21,6 +21,8 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
 
+# See https://gitlab.com/northscaler-public/release-management/-/blob/dev/readme.md for more information.
+
 # This script implements a minor-release-per-branch workflow projects using git for source control.
 # It supports many different technologies by using low-tech means (sed, awk, etc) to manage version strings.
 
