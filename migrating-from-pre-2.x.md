@@ -2,9 +2,9 @@
 
 > NOTE: The behavior of `release-management` has not changed, only the syntax of the invocations.
 
-Here are the steps to migrate from pre-2.x versions of `release-manageent`:
+Here are the steps to migrate from pre-2.x versions of `release-management`:
 
-* Remove all legacy release scripts:  `rm release*`.
+* Remove all legacy release scripts:  `rm release*` or similar.
 * Update your `.gitignore` file if necessary so that you're ignoring `release.sh`.
 * Download [the new `release.sh` script](release.sh) manually once.
 * Make `release.sh` executable with `chmod +x release.sh` or similar.
