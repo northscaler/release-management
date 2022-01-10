@@ -276,14 +276,14 @@ RM_MAVEN_FILE="${RM_MAVEN_FILE:-pom.xml}"
 getVersion_maven() {
   local RM_MAVEN_FILE_PATHNAME="${1:-$RM_MAVEN_DIR/$RM_MAVEN_FILE}"
 
-  cat "$RM_MAVEN_FILE_PATHNAME" | $XMLSTARLET sel -N x=http://maven.apache.org/POM/4.0.0 -t -v /x:project/x:version -
+  cat "$RM_MAVEN_FILE_PATHNAME" | eval "$XMLSTARLET sel -N x=http://maven.apache.org/POM/4.0.0 -t -v /x:project/x:version -"
 }
 
 setVersion_maven() {
   local V=$1
   local RM_MAVEN_FILE_PATHNAME="${2:-$RM_MAVEN_DIR/$RM_MAVEN_FILE}"
 
-  cat "$RM_MAVEN_FILE_PATHNAME" | $XMLSTARLET ed -P -N x=http://maven.apache.org/POM/4.0.0 -u /x:project/x:version -v $V > "$RM_MAVEN_FILE_PATHNAME.tmp"
+  cat "$RM_MAVEN_FILE_PATHNAME" | eval "$XMLSTARLET ed -P -N x=http://maven.apache.org/POM/4.0.0 -u /x:project/x:version -v $V" > "$RM_MAVEN_FILE_PATHNAME.tmp"
   mv "$RM_MAVEN_FILE_PATHNAME.tmp" "$RM_MAVEN_FILE_PATHNAME"
 
   verbose "$RM_MAVEN_FILE is now:"
@@ -809,8 +809,9 @@ for t in $RM_TECHNOLOGIES; do
   pathnames="$(eval "echo \$RM_PATHNAMES_$t")"
   for p in $pathnames; do
     fqpn="$(realpath "$p")"
-    verbose invoking: getVersion_$t $fqpn
+    debug "invoking: getVersion_$t $fqpn"
     v="$(getVersion_$t "$fqpn")"
+    verbose "file '$fqpn' has version '$v'"
     if [ -n "$v_last" ] && [ "$v_last" != "$v" ]; then
       echo "ERROR: versions among different version files differ:" >&2
       echo "$t is at $v in $p" >&2

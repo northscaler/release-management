@@ -7,7 +7,10 @@ THIS_ABSPATH="$(cd "$(dirname "$0")"; pwd)"
 SCRIPT="${SCRIPT:-release.sh}"
 PREFIX="${PREFIX:-$THIS_ABSPATH/../..}"
 
-OPTS='--pre-rc --helm-chart-dir release-test-chart --verbose'
+OPTS='--pre-rc --verbose'
+if echo "$TEST_TYPE" | grep -Eq helm; then
+  OPTS="$OPTS --helm-chart-dir release-test-chart"
+fi
 
 # TODO: test assertions & saddy paths
 
