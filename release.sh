@@ -137,11 +137,11 @@ RM_CSHARP_ENTRY="${RM_CSHARP_ENTRY:-AssemblyInformationalVersion}"
 getVersion_csharp() {
   local RM_CSHARP_FILE_PATHNAME="${1:-$RM_CSHARP_DIR/$RM_CSHARP_FILE}"
 
-  cat "$RM_CSHARP_FILE_PATHNAME" | grep "$RM_CSHARP_ENTRY" | $MATCH \".*\" | sed 's/"//g'
+  cat "$RM_CSHARP_FILE_PATHNAME" | grep -E "$RM_CSHARP_ENTRY" | eval "$MATCH '(\d+\.\d+\.\d+(-.+\.\d+)?)'" | awk '{ print $1 }'
 }
 
 setVersion_csharp() {
-  local VER="$(echo "$1" | $MATCH '([0-9]{1,}\.[0-9]{1,}\.[0-9]{1,})' | awk '{print $2}')"
+  local VER="$(echo "$1" | eval "$MATCH '([0-9]{1,}\.[0-9]{1,}\.[0-9]{1,})'" | awk '{print $2}')"
   local AFV="$VER.0"
   local AV="$VER.*"
 
@@ -170,7 +170,7 @@ RM_GRADLE_FILE="${RM_GRADLE_FILE:-build.gradle}"
 getVersion_gradle() {
   local RM_GRADLE_FILE_PATHNAME="${1:-$RM_GRADLE_DIR/$RM_GRADLE_FILE}"
 
-  cat "$RM_GRADLE_FILE_PATHNAME" | egrep "^version" | $MATCH \'.*\' | sed "s/'//g"
+  cat "$RM_GRADLE_FILE_PATHNAME" | grep -E "^version" | eval "$MATCH \'.*\'" | sed "s/'//g"
 }
 
 setVersion_gradle() {
@@ -198,7 +198,7 @@ RM_GRADLE_KOTLIN_FILE="${RM_GRADLE_KOTLIN_FILE:-build.gradle.kts}"
 getVersion_gradlekts() {
   local RM_GRADLE_KOTLIN_FILE_PATHNAME="${1:-$RM_GRADLE_KOTLIN_DIR/$RM_GRADLE_KOTLIN_FILE}"
 
-  cat "$RM_GRADLE_KOTLIN_FILE_PATHNAME" | egrep "^version" | egrep -o "['\"].*['\"]" | tr '"' ' ' | tr "'" ' ' | xargs
+  cat "$RM_GRADLE_KOTLIN_FILE_PATHNAME" | grep -E "^version" | grep -Eo "['\"].*['\"]" | tr '"' ' ' | tr "'" ' ' | xargs
 }
 
 # usage: setVersion version
@@ -229,7 +229,7 @@ getVersion_docker() {
   set -x
   local RM_DOCKER_FILE_PATHNAME="${1:-$RM_DOCKER_DIR/$RM_DOCKER_FILE}"
 
-  echo "$(egrep '^LABEL' "$RM_DOCKER_FILE_PATHNAME" | egrep -o "$RM_DOCKER_VERSION_LABEL=\"?[0-9]+\.[0-9]+\.[0-9]+(-[^ \"]*)?\"?" | cut -d'=' -f2 | sed 's/"//g')"
+  echo "$(grep -E '^LABEL' "$RM_DOCKER_FILE_PATHNAME" | grep -Eo "$RM_DOCKER_VERSION_LABEL=\"?[0-9]+\.[0-9]+\.[0-9]+(-[^ \"]*)?\"?" | cut -d'=' -f2 | sed 's/"//g')"
   set +x
 }
 
@@ -242,7 +242,7 @@ setVersion_docker() {
   local lines
 
   printf "$(cat "$RM_DOCKER_FILE_PATHNAME")\n" | while read line; do
-    label="$(echo "$line"  | egrep '^LABEL' | egrep "$RM_DOCKER_VERSION_LABEL=\"?[0-9]+\.[0-9]+\.[0-9]+(-[^ \"]*)?\"?" || true)"
+    label="$(echo "$line"  | grep -E '^LABEL' | grep -E "$RM_DOCKER_VERSION_LABEL=\"?[0-9]+\.[0-9]+\.[0-9]+(-[^ \"]*)?\"?" || true)"
     if [ -z "$label" ]; then # skip it
       if [ $first = true ]; then
         first=false
@@ -306,11 +306,11 @@ getVersion_nodejs() {
 
   local RM_NODEJS_DOCKER="docker run --rm -i -v $RM_NODEJS_DIR:/cwd -w /cwd node"
   local RM_NODEJS_NODE=node
-  if [ -n "$NO_USE_LOCAL_NODEJS" ] || ! $RM_NODEJS_NODE --version >/dev/null 2>&1; then
+  if [ -n "$NO_USE_LOCAL_NODEJS" ] || ! eval "$RM_NODEJS_NODE --version" >/dev/null 2>&1; then
     RM_NODEJS_NODE="$RM_NODEJS_DOCKER node"
   fi
 
-  (cd "$RM_NODEJS_DIR" && $RM_NODEJS_NODE -e 'console.log(require("./package.json").version)')
+  (cd "$RM_NODEJS_DIR" && eval "$RM_NODEJS_NODE -e 'console.log(require(\"./package.json\").version)'")
 }
 
 setVersion_nodejs() {
@@ -322,16 +322,16 @@ setVersion_nodejs() {
   local RM_NODEJS_DOCKER="docker run --rm -i -v $RM_NODEJS_DIR:/cwd -w /cwd node"
 
   local RM_NODEJS_NODE=node
-  if [ -n "$NO_USE_LOCAL_NODEJS" ] || ! $RM_NODEJS_NODE --version >/dev/null 2>&1; then
+  if [ -n "$NO_USE_LOCAL_NODEJS" ] || ! eval "$RM_NODEJS_NODE --version" >/dev/null 2>&1; then
     RM_NODEJS_NODE="$RM_NODEJS_DOCKER node"
   fi
 
   RM_NODEJS_NPM=npm
-  if [ -n "$NO_USE_LOCAL_NPM" ] || ! $RM_NODEJS_NPM --version >/dev/null 2>&1; then
+  if [ -n "$NO_USE_LOCAL_NPM" ] || ! eval "$RM_NODEJS_NPM --version" >/dev/null 2>&1; then
     RM_NODEJS_NPM="$RM_NODEJS_DOCKER npm"
   fi
 
-  (cd "$RM_NODEJS_DIR" && $RM_NODEJS_NPM version --no-git-tag-version --allow-same-version $V)
+  (cd "$RM_NODEJS_DIR" && eval "$RM_NODEJS_NPM version --no-git-tag-version --allow-same-version $V")
 
   verbose "$RM_NODEJS_FILE_PATHNAME is now:"
   verbose "$(cat "$RM_NODEJS_FILE_PATHNAME")"
@@ -349,7 +349,7 @@ RM_SCALA_SBT_FILE="${RM_SCALA_SBT_FILE:-build.sbt}"
 getVersion_sbt() {
   local RM_SCALA_SBT_FILE_PATHNAME="${1:-$RM_SCALA_SBT_DIR/$RM_SCALA_SBT_FILE}"
 
-  cat "$RM_SCALA_SBT_FILE_PATHNAME" | egrep "^version\s*\:\=.*" | $MATCH \".*\" | sed 's/"//g'
+  cat "$RM_SCALA_SBT_FILE_PATHNAME" | grep -E "^version\s*\:\=.*" | eval "$MATCH \".*\"" | sed 's/"//g'
 }
 
 setVersion_sbt() {
