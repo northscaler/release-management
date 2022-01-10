@@ -15,4 +15,4 @@ build:
     - git config --global user.email "ci@northscaler.com"
     - git config --global user.name "Release Management"
     - apk add bash
-    - bash -c ./test/test-all.sh
+    - bash -c ./test/polyrepos/test-all.sh
