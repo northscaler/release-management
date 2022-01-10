@@ -59,10 +59,7 @@ RM_ERR_INVOCATION=1
 RM_ERR_VERSIONS=2
 RM_ERR_GIT_STATE=3
 
-THIS_ABSPATH="$(
-  cd "$(dirname "$0")"
-  pwd
-)"
+THIS_ABSPATH="$(realpath "$0")"
 
 verbose() {
   if [ -n "$RM_VERBOSE" ]; then
@@ -107,9 +104,11 @@ RM_HELM_CHART_DIR=${RM_HELM_CHART_DIR:-$(pwd)}
 RM_HELM_CHART_FILE="${RM_HELM_CHART_FILE:-Chart.yaml}"
 
 getVersion_helm() {
+  set -x
   local RM_HELM_CHART_FILE_PATHNAME="${1:-$RM_HELM_CHART_DIR/$RM_HELM_CHART_FILE}"
 
-  cat "$RM_HELM_CHART_FILE_PATHNAME" | $YMLX this.version
+  cat "$RM_HELM_CHART_FILE_PATHNAME" | eval "$YMLX this.version"
+  set +x
 }
 
 setVersion_helm() {
@@ -118,7 +117,7 @@ setVersion_helm() {
   local FC="$(cat $RM_HELM_CHART_FILE_PATHNAME)"
 
   echo "$FC" \
-    | $YMLX "it => { it.version = \"$V\"; return it; }" \
+    | eval "$YMLX 'it => { it.version = \"$V\"; return it; }'" \
     > "$RM_HELM_CHART_FILE_PATHNAME"
 
   verbose "$RM_HELM_CHART_FILE_PATHNAME is now:"
@@ -583,12 +582,12 @@ while [ $# -gt 0 ]; do
     shift
     RM_HELM_CHART_FILE="$1"
     shift
-    RM_PATHNAMES_chart="" # negates any prior --helm-chart-pathname args
+    RM_PATHNAMES_helm="" # negates any prior --helm-chart-pathname args
     RM_TECH="$RM_TECH,helm"
     ;;
   --helm-chart-pathname)
     shift
-    RM_PATHNAMES_chart=":$RM_PATHNAMES_chart:$1"
+    RM_PATHNAMES_helm=":$RM_PATHNAMES_helm:$1"
     shift
     RM_TECH="$RM_TECH,helm"
     ;;
@@ -723,32 +722,32 @@ while [ $# -gt 0 ]; do
   shift
 done
 
-if [ -n "$RM_PATHNAMES_chart" ]; then
-  RM_PATHNAMES_chart="$RM_HELM_CHART_DIR/$RM_HELM_CHART_FILE"
+if [ -z "$RM_PATHNAMES_helm" ]; then
+  RM_PATHNAMES_helm="$(realpath "$RM_HELM_CHART_DIR/$RM_HELM_CHART_FILE")"
 fi
-if [ -n "$RM_PATHNAMES_csharp" ]; then
-  RM_PATHNAMES_csharp="$RM_CSHARP_DIR/$RM_CSHARP_FILE"
+if [ -z "$RM_PATHNAMES_csharp" ]; then
+  RM_PATHNAMES_csharp="$(realpath "$RM_CSHARP_DIR/$RM_CSHARP_FILE")"
 fi
-if [ -n "$RM_PATHNAMES_gradle" ]; then
-  RM_PATHNAMES_gradle="$RM_GRADLE_DIR/$RM_GRADLE_FILE"
+if [ -z "$RM_PATHNAMES_gradle" ]; then
+  RM_PATHNAMES_gradle="$(realpath "$RM_GRADLE_DIR/$RM_GRADLE_FILE")"
 fi
-if [ -n "$RM_PATHNAMES_gradlekts" ]; then
-  RM_PATHNAMES_gradlekts="$RM_GRADLE_KOTLIN_DIR/$RM_GRADLE_KOTLIN_FILE"
+if [ -z "$RM_PATHNAMES_gradlekts" ]; then
+  RM_PATHNAMES_gradlekts="$(realpath "$RM_GRADLE_KOTLIN_DIR/$RM_GRADLE_KOTLIN_FILE")"
 fi
-if [ -n "$RM_PATHNAMES_docker" ]; then
-  RM_PATHNAMES_docker="$RM_DOCKER_DIR/$RM_DOCKER_FILE"
+if [ -z "$RM_PATHNAMES_docker" ]; then
+  RM_PATHNAMES_docker="$(realpath "$RM_DOCKER_DIR/$RM_DOCKER_FILE")"
 fi
-if [ -n "$RM_PATHNAMES_maven" ]; then
-  RM_PATHNAMES_maven="$RM_MAVEN_DIR/$RM_MAVEN_FILE"
+if [ -z "$RM_PATHNAMES_maven" ]; then
+  RM_PATHNAMES_maven="$(realpath "$RM_MAVEN_DIR/$RM_MAVEN_FILE")"
 fi
-if [ -n "$RM_PATHNAMES_scala" ]; then
-  RM_PATHNAMES_scala="$RM_SCALA_SBT_DIR/$RM_SCALA_SBT_FILE"
+if [ -z "$RM_PATHNAMES_scala" ]; then
+  RM_PATHNAMES_scala="$(realpath "$RM_SCALA_SBT_DIR/$RM_SCALA_SBT_FILE")"
 fi
-if [ -n "$RM_PATHNAMES_nodejs" ]; then
-  RM_PATHNAMES_nodejs="$RM_NODEJS_DIR/$RM_NODEJS_PACKAGE_JSON_FILE"
+if [ -z "$RM_PATHNAMES_nodejs" ]; then
+  RM_PATHNAMES_nodejs="$(realpath "$RM_NODEJS_DIR/$RM_NODEJS_PACKAGE_JSON_FILE")"
 fi
-if [ -n "$RM_PATHNAMES_version" ]; then
-  RM_PATHNAMES_version="$RM_VERSION_DIR/$RM_VERSION_FILE"
+if [ -z "$RM_PATHNAMES_version" ]; then
+  RM_PATHNAMES_version="$(realpath "$RM_VERSION_DIR/$RM_VERSION_FILE")"
 fi
 
 # validations
@@ -803,12 +802,15 @@ verbose "INFO: invocation ok; checking required preconditions"
 
 git pull $RM_ORIGIN
 
-# check that all versions are exactly the same
+verbose "checking that all versions are exactly the same"
 for t in $RM_TECHNOLOGIES; do
   ORIG_IFS="$IFS"
   IFS=':'
-  for p in $(eval "echo \$RM_PATHNAMES_$t"); do
-    v="$(getVersion_$t "$p")"
+  pathnames="$(eval "echo \$RM_PATHNAMES_$t")"
+  for p in $pathnames; do
+    fqpn="$(realpath "$p")"
+    verbose invoking: getVersion_$t $fqpn
+    v="$(getVersion_$t "$fqpn")"
     if [ -n "$v_last" ] && [ "$v_last" != "$v" ]; then
       echo "ERROR: versions among different version files differ:" >&2
       echo "$t is at $v in $p" >&2
