@@ -297,29 +297,30 @@ setVersion_maven() {
 ##### begin nodejs package.json support
 #####
 RM_NODEJS_DIR="${RM_NODEJS_DIR:-$(pwd)}"
-RM_NODEJS_PACKAGE_JSON="${RM_NODEJS_PACKAGE_JSON:-package.json}"
+RM_NODEJS_PACKAGE_JSON_FILE="${RM_NODEJS_PACKAGE_JSON_FILE:-package.json}"
 
 getVersion_nodejs() {
-  local RM_NODEJS_DIR="${1:-$RM_NODEJS_DIR}"
-  # make an absolute path
-  RM_NODEJS_DIR="$(cd "$RM_NODEJS_DIR" && pwd)"
+  local RM_NODEJS_PATHNAME="$1"
+  local RM_NODEJS_DIR_PATHNAME="$(realpath "$(dirname "$RM_NODEJS_PATHNAME")")"
+  local RM_NODEJS_FILENAME="$(basename "$RM_NODEJS_PATHNAME")"
 
-  local RM_NODEJS_DOCKER="docker run --rm -i -v $RM_NODEJS_DIR:/cwd -w /cwd node"
+  local RM_NODEJS_DOCKER="docker run --rm -i -v $RM_NODEJS_DIR_PATHNAME:/cwd -w /cwd node"
   local RM_NODEJS_NODE=node
   if [ -n "$NO_USE_LOCAL_NODEJS" ] || ! eval "$RM_NODEJS_NODE --version" >/dev/null 2>&1; then
     RM_NODEJS_NODE="$RM_NODEJS_DOCKER node"
   fi
 
-  (cd "$RM_NODEJS_DIR" && eval "$RM_NODEJS_NODE -e 'console.log(require(\"./package.json\").version)'")
+  set -x
+  eval "$RM_NODEJS_NODE -e 'console.log(require(\"./$RM_NODEJS_FILENAME\").version)'"
+  set +x
 }
 
 setVersion_nodejs() {
   local V=$1
-  local RM_NODEJS_DIR="${2:-$RM_NODEJS_DIR}"
-  # make an absolute path
-  RM_NODEJS_DIR="$(cd "$RM_NODEJS_DIR" && pwd)"
-  local RM_NODEJS_FILE_PATHNAME="$RM_NODEJS_DIR/$RM_NODEJS_PACKAGE_JSON"
-  local RM_NODEJS_DOCKER="docker run --rm -i -v $RM_NODEJS_DIR:/cwd -w /cwd node"
+  local RM_NODEJS_PATHNAME="$2"
+  local RM_NODEJS_DIR_PATHNAME="$(realpath "$(dirname "$RM_NODEJS_PATHNAME")")"
+  local RM_NODEJS_FILENAME="$(basename "$1")"
+  local RM_NODEJS_DOCKER="docker run --rm -i -v $RM_NODEJS_DIR_PATHNAME:/cwd -w /cwd node"
 
   local RM_NODEJS_NODE=node
   if [ -n "$NO_USE_LOCAL_NODEJS" ] || ! eval "$RM_NODEJS_NODE --version" >/dev/null 2>&1; then
@@ -331,10 +332,10 @@ setVersion_nodejs() {
     RM_NODEJS_NPM="$RM_NODEJS_DOCKER npm"
   fi
 
-  (cd "$RM_NODEJS_DIR" && eval "$RM_NODEJS_NPM version --no-git-tag-version --allow-same-version $V")
+  (cd "$RM_NODEJS_DIR_PATHNAME" && eval "$RM_NODEJS_NPM version --no-git-tag-version --allow-same-version $V")
 
-  verbose "$RM_NODEJS_FILE_PATHNAME is now:"
-  verbose "$(cat "$RM_NODEJS_FILE_PATHNAME")"
+  verbose "$RM_NODEJS_PATHNAME is now:"
+  verbose "$(cat "$RM_NODEJS_PATHNAME")"
 }
 #####
 ##### end nodejs package.json support
