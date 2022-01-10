@@ -525,6 +525,11 @@ while [ $# -gt 0 ]; do
     RM_NODEJS_PACKAGE_JSON_DIR="$(dirname "$RM_NODEJS_PACKAGE_JSON" | sed -E "s|^\.|$PWD|")"
     shift
     ;;
+  --version-file)
+    shift
+    RM_VERSION_FILE="$1"
+    shift
+    ;;
   --help | -h)
     usage >&2
     exit 0
