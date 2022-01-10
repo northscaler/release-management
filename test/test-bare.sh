@@ -7,7 +7,7 @@ THIS_ABSPATH="$(cd "$(dirname "$0")"; pwd)"
 SCRIPT="${SCRIPT:-release.sh}"
 PREFIX="${PREFIX:-$THIS_ABSPATH/..}"
 
-OPTS='--pre-rc --helm-chart-dir release-test-chart'
+OPTS='--pre-rc --helm-chart-dir release-test-chart --verbose'
 
 # TODO: test assertions & saddy paths
 

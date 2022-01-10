@@ -53,6 +53,8 @@
 
 set -e
 
+RM_DEBUG=${RM_DEBUG:-""}
+
 RM_ERR_INVOCATION=1
 RM_ERR_VERSIONS=2
 RM_ERR_GIT_STATE=3
@@ -98,6 +100,14 @@ RM_RC=${RM_RC:-$RM_DEFAULT_RC}
 RM_VERBOSE=${RM_VERBOSE:-''}
 RM_CHERRY_PICK_RELEASE_COMMIT_TO_MAIN=1
 
+def() {
+  if [ -n "$1" ]; then
+    echo "$2"
+  else
+    echo "$1"
+  fi
+}
+
 #####
 ##### begin Helm Chart support
 #####
@@ -105,18 +115,22 @@ RM_HELM_CHART_DIR=${RM_HELM_CHART_DIR:-$(pwd)}
 RM_HELM_CHART_FILE="${RM_HELM_CHART_FILE:-Chart.yaml}"
 
 getVersion_helm() {
-  local RM_HELM_CHART_FILE_PATHNAME="$RM_HELM_CHART_DIR/$RM_HELM_CHART_FILE"
+  local RM_HELM_CHART_FILE_PATHNAME="${1:-$RM_HELM_CHART_DIR/$RM_HELM_CHART_FILE}"
+
   cat "$RM_HELM_CHART_FILE_PATHNAME" | $YMLX this.version
 }
 
 setVersion_helm() {
   local V=$1
-  local RM_HELM_CHART_FILE_PATHNAME="$RM_HELM_CHART_DIR/$RM_HELM_CHART_FILE"
+  local RM_HELM_CHART_FILE_PATHNAME="${2:-$RM_HELM_CHART_DIR/$RM_HELM_CHART_FILE}"
   local FC="$(cat $RM_HELM_CHART_FILE_PATHNAME)"
+
   echo "$FC" \
     | $YMLX "it => { it.version = \"$V\"; return it; }" \
-    > $RM_HELM_CHART_FILE_PATHNAME
-  verbose "$RM_HELM_CHART_FILE_PATHNAME is now: $(cat "$RM_HELM_CHART_FILE_PATHNAME")"
+    > "$RM_HELM_CHART_FILE_PATHNAME"
+
+  verbose "$RM_HELM_CHART_FILE_PATHNAME is now:"
+  verbose "$(cat "$RM_HELM_CHART_FILE_PATHNAME")"
 }
 #####
 ##### end Helm Chart support
@@ -125,25 +139,32 @@ setVersion_helm() {
 #####
 ##### begin C# support
 #####
+RM_CSHARP_DIR="${RM_CSHARP_DIR:-$(pwd)}"
 RM_CSHARP_FILE="${RM_CSHARP_FILE:-AssemblyInfo.cs}"
 RM_CSHARP_ENTRY="${RM_CSHARP_ENTRY:-AssemblyInformationalVersion}"
 
 getVersion_csharp() {
-  cat "$RM_CSHARP_FILE" | grep "$RM_CSHARP_ENTRY" | $MATCH \".*\" | sed 's/"//g'
+  local RM_CSHARP_FILE_PATHNAME="${1:-$RM_CSHARP_DIR/$RM_CSHARP_FILE}"
+
+  cat "$RM_CSHARP_FILE_PATHNAME" | grep "$RM_CSHARP_ENTRY" | $MATCH \".*\" | sed 's/"//g'
 }
 
 setVersion_csharp() {
   local VER="$(echo "$1" | $MATCH '([0-9]{1,}\.[0-9]{1,}\.[0-9]{1,})' | awk '{print $2}')"
-  local FV="$VER.0"
+  local AFV="$VER.0"
   local AV="$VER.*"
 
-  local FC="$(cat "$RM_CSHARP_FILE")"
+  local RM_CSHARP_FILE_PATHNAME="${2:-$RM_CSHARP_DIR/$RM_CSHARP_FILE}"
+  local FC="$(cat "$RM_CSHARP_FILE_PATHNAME")"
+
   echo "$FC" \
-  | sed "s/AssemblyFileVersion.*/AssemblyFileVersion\(\"$FV\"\)]/" \
+  | sed "s/AssemblyFileVersion.*/AssemblyFileVersion\(\"$AFV\"\)]/" \
   | sed "s/AssemblyVersion.*/AssemblyVersion\(\"$AV\"\)]/" \
-  | sed "s/AssemblyInformationalVersion.*/AssemblyInformationalVersion\(\"$1\"\)]/" \
-  > "$RM_CSHARP_FILE"
-  verbose "$RM_CSHARP_FILE is now: $(cat cat "$RM_CSHARP_FILE")"
+  | sed "s/$RM_CSHARP_ENTRY.*/$RM_CSHARP_ENTRY\(\"$1\"\)]/" \
+  > "$RM_CSHARP_FILE_PATHNAME"
+
+  verbose "$RM_CSHARP_FILE_PATHNAME is now:"
+  verbose "$(cat "$RM_CSHARP_FILE_PATHNAME")"
 }
 #####
 ##### end C# support
@@ -152,19 +173,26 @@ setVersion_csharp() {
 #####
 ##### begin gradle support
 #####
+RM_GRADLE_DIR="${RM_GRADLE_DIR:-$(pwd)}"
 RM_GRADLE_FILE="${RM_GRADLE_FILE:-build.gradle}"
 
 getVersion_gradle() {
-  cat "$RM_GRADLE_FILE" | egrep "^version" | $MATCH \'.*\' | sed "s/'//g"
+  local RM_GRADLE_FILE_PATHNAME="${1:-$RM_GRADLE_DIR/$RM_GRADLE_FILE}"
+
+  cat "$RM_GRADLE_FILE_PATHNAME" | egrep "^version" | $MATCH \'.*\' | sed "s/'//g"
 }
 
 setVersion_gradle() {
+  local RM_GRADLE_FILE_PATHNAME="${2:-$RM_GRADLE_DIR/$RM_GRADLE_FILE}"
   local V=$1
   local FC="$(cat "$RM_GRADLE_FILE")"
+
   echo "$FC" \
   | sed "s/^version.*/version = \'$V\'/" \
-  > "$RM_GRADLE_FILE"
-  verbose "$RM_GRADLE_FILE is now: $(cat cat "$RM_GRADLE_FILE")"
+  > "$RM_GRADLE_FILE_PATHNAME"
+
+  verbose "$RM_GRADLE_FILE_PATHNAME is now:"
+  verbose "$(cat "$RM_GRADLE_FILE_PATHNAME")"
 }
 #####
 ##### end gradle support
@@ -173,21 +201,27 @@ setVersion_gradle() {
 #####
 ##### begin gradlekts support
 #####
+RM_GRADLE_KOTLIN_DIR="${RM_GRADLE_KOTLIN_DIR:-$(pwd)}"
 RM_GRADLE_KOTLIN_FILE="${RM_GRADLE_KOTLIN_FILE:-build.gradle.kts}"
 
 getVersion_gradlekts() {
-  cat "$RM_GRADLE_KOTLIN_FILE" | egrep "^version" | egrep -o "['\"].*['\"]" | tr '"' ' ' | tr "'" ' ' | xargs
+  local RM_GRADLE_KOTLIN_FILE_PATHNAME="${1:-$RM_GRADLE_KOTLIN_DIR/$RM_GRADLE_KOTLIN_FILE}"
+
+  cat "$RM_GRADLE_KOTLIN_FILE_PATHNAME" | egrep "^version" | egrep -o "['\"].*['\"]" | tr '"' ' ' | tr "'" ' ' | xargs
 }
 
 # usage: setVersion version
 setVersion_gradlekts() {
   local V=$1
-
   local FC="$(cat "$RM_GRADLE_KOTLIN_FILE")"
+  local RM_GRADLE_KOTLIN_FILE_PATHNAME="${2:-$RM_GRADLE_KOTLIN_DIR/$RM_GRADLE_KOTLIN_FILE}"
+
   echo "$FC" \
   | sed "s/^version.*/version = \"$V\"/" \
-  > "$RM_GRADLE_KOTLIN_FILE"
-  verbose "$RM_GRADLE_KOTLIN_FILE is now: $(cat cat "$RM_GRADLE_KOTLIN_FILE")"
+  > "$RM_GRADLE_KOTLIN_FILE_PATHNAME"
+
+  verbose "$RM_GRADLE_KOTLIN_FILE_PATHNAME is now:"
+  verbose "$(cat cat "$RM_GRADLE_KOTLIN_FILE_PATHNAME")"
 }
 #####
 ##### end gradlekts support
@@ -196,19 +230,27 @@ setVersion_gradlekts() {
 #####
 ##### begin Docker image support
 #####
+RM_DOCKER_DIR="${RM_DOCKER_DIR:-$(pwd)}"
 RM_DOCKER_FILE="${RM_DOCKER_FILE:-Dockerfile}"
 RM_DOCKER_VERSION_LABEL="${RM_DOCKER_VERSION_LABEL:-version}"
 
 getVersion_docker() {
-  echo "$(egrep '^LABEL' "$RM_DOCKER_FILE" | egrep -o "$RM_DOCKER_VERSION_LABEL=\"?[0-9]+\.[0-9]+\.[0-9]+(-[^ \"]*)?\"?" | cut -d'=' -f2 | sed 's/"//g')"
+  set -x
+  local RM_DOCKER_FILE_PATHNAME="${1:-$RM_DOCKER_DIR/$RM_DOCKER_FILE}"
+
+  echo "$(egrep '^LABEL' "$RM_DOCKER_FILE_PATHNAME" | egrep -o "$RM_DOCKER_VERSION_LABEL=\"?[0-9]+\.[0-9]+\.[0-9]+(-[^ \"]*)?\"?" | cut -d'=' -f2 | sed 's/"//g')"
+  set +x
 }
 
 setVersion_docker() {
+  set -x
   local V=$1
   local label
   local first=true
+  local RM_DOCKER_FILE_PATHNAME="${2:-$RM_DOCKER_DIR/$RM_DOCKER_FILE}"
   local lines
-  printf "$(cat "$RM_DOCKER_FILE")\n" | while read line; do
+
+  printf "$(cat "$RM_DOCKER_FILE_PATHNAME")\n" | while read line; do
     label="$(echo "$line"  | egrep '^LABEL' | egrep "$RM_DOCKER_VERSION_LABEL=\"?[0-9]+\.[0-9]+\.[0-9]+(-[^ \"]*)?\"?" || true)"
     if [ -z "$label" ]; then # skip it
       if [ $first = true ]; then
@@ -221,12 +263,14 @@ setVersion_docker() {
       line="$(echo "$label" | sed -E "s/$RM_DOCKER_VERSION_LABEL=\"?[0-9]+\.[0-9]+\.[0-9]+(-[^ \"]*)?\"?/$RM_DOCKER_VERSION_LABEL=$1/")"
       lines="$lines\n$line"
     fi
-    printf "$lines" > "$RM_DOCKER_FILE"
+    printf "$lines" > "$RM_DOCKER_FILE_PATHNAME"
   done
-  lines="$(cat "$RM_DOCKER_FILE")\n"
-  printf "$lines" > "$RM_DOCKER_FILE"
+  lines="$(cat "$RM_DOCKER_FILE_PATHNAME")\n"
+  printf "$lines" > "$RM_DOCKER_FILE_PATHNAME"
 
-  verbose "$RM_DOCKER_FILE is now: $(cat cat "$RM_DOCKER_FILE")"
+  verbose "$RM_DOCKER_FILE_PATHNAME is now:"
+  verbose "$(cat cat "$RM_DOCKER_FILE_PATHNAME")"
+  set +x
 }
 #####
 ##### end Docker image support
@@ -235,18 +279,24 @@ setVersion_docker() {
 #####
 ##### begin Maven pom.xml support
 #####
+RM_MAVEN_DIR="${RM_MAVEN_DIR:-$(pwd)}"
 RM_MAVEN_FILE="${RM_MAVEN_FILE:-pom.xml}"
 
 getVersion_maven() {
-  cat "$RM_MAVEN_FILE" | $XMLSTARLET sel -N x=http://maven.apache.org/POM/4.0.0 -t -v /x:project/x:version -
+  local RM_MAVEN_FILE_PATHNAME="${1:-$RM_MAVEN_DIR/$RM_MAVEN_FILE}"
+
+  cat "$RM_MAVEN_FILE_PATHNAME" | $XMLSTARLET sel -N x=http://maven.apache.org/POM/4.0.0 -t -v /x:project/x:version -
 }
 
 setVersion_maven() {
   local V=$1
+  local RM_MAVEN_FILE_PATHNAME="${2:-$RM_MAVEN_DIR/$RM_MAVEN_FILE}"
 
-  cat "$RM_MAVEN_FILE" | $XMLSTARLET ed -P -N x=http://maven.apache.org/POM/4.0.0 -u /x:project/x:version -v $V > "$RM_MAVEN_FILE.tmp"
-  mv "$RM_MAVEN_FILE.tmp" "$RM_MAVEN_FILE"
-  verbose "$RM_MAVEN_FILE is now: $(cat "$RM_MAVEN_FILE")"
+  cat "$RM_MAVEN_FILE_PATHNAME" | $XMLSTARLET ed -P -N x=http://maven.apache.org/POM/4.0.0 -u /x:project/x:version -v $V > "$RM_MAVEN_FILE_PATHNAME.tmp"
+  mv "$RM_MAVEN_FILE_PATHNAME.tmp" "$RM_MAVEN_FILE_PATHNAME"
+
+  verbose "$RM_MAVEN_FILE is now:"
+  verbose "$(cat "$RM_MAVEN_FILE")"
 }
 #####
 ##### end Maven pom.xml support
@@ -255,28 +305,40 @@ setVersion_maven() {
 #####
 ##### begin nodejs package.json support
 #####
+RM_NODEJS_DIR="${RM_NODEJS_DIR:-$(pwd)}"
 RM_NODEJS_PACKAGE_JSON="${RM_NODEJS_PACKAGE_JSON:-package.json}"
-RM_NODEJS_PACKAGE_JSON_DIR="$(dirname "$RM_NODEJS_PACKAGE_JSON" | sed -E "s|^\.|$PWD|")"
-
-RM_NODEJS_DOCKER="docker run --rm -i -v $RM_NODEJS_PACKAGE_JSON_DIR:$RM_NODEJS_PACKAGE_JSON_DIR -w $RM_NODEJS_PACKAGE_JSON_DIR node"
-RM_NODEJS_NODE=node
-if [ -n "$NO_USE_LOCAL_NODEJS" ] || ! $RM_NODEJS_NODE --version >/dev/null 2>&1; then
-  RM_NODEJS_NODE="$RM_NODEJS_DOCKER node"
-fi
-
-RM_NODEJS_NPM=npm
-if [ -n "$NO_USE_LOCAL_NPM" ] || ! $RM_NODEJS_NPM --version >/dev/null 2>&1; then
-  RM_NODEJS_NPM="$RM_NODEJS_DOCKER npm"
-fi
 
 getVersion_nodejs() {
-  (cd "$RM_NODEJS_PACKAGE_JSON_DIR" && $RM_NODEJS_NODE -e 'console.log(require("./package.json").version)')
+  local RM_NODEJS_DIR="${1:-$RM_NODEJS_DIR}"
+  local RM_NODEJS_DOCKER="docker run --rm -i -v $RM_NODEJS_DIR:/cwd -w /cwd node"
+  local RM_NODEJS_NODE=node
+  if [ -n "$NO_USE_LOCAL_NODEJS" ] || ! $RM_NODEJS_NODE --version >/dev/null 2>&1; then
+    RM_NODEJS_NODE="$RM_NODEJS_DOCKER node"
+  fi
+
+  (cd "$RM_NODEJS_DIR" && $RM_NODEJS_NODE -e 'console.log(require("./package.json").version)')
 }
 
 setVersion_nodejs() {
   local V=$1
-  (cd "$RM_NODEJS_PACKAGE_JSON_DIR" && $RM_NODEJS_NPM version --no-git-tag-version --allow-same-version $V)
-  verbose "$RM_NODEJS_PACKAGE_JSON is now: $(cat "$RM_NODEJS_PACKAGE_JSON")"
+  local RM_NODEJS_DIR="${2:-$RM_NODEJS_DIR}"
+  local RM_NODEJS_FILE_PATHNAME="$RM_NODEJS_DIR/$RM_NODEJS_PACKAGE_JSON"
+  local RM_NODEJS_DOCKER="docker run --rm -i -v $RM_NODEJS_DIR:/cwd -w /cwd node"
+
+  local RM_NODEJS_NODE=node
+  if [ -n "$NO_USE_LOCAL_NODEJS" ] || ! $RM_NODEJS_NODE --version >/dev/null 2>&1; then
+    RM_NODEJS_NODE="$RM_NODEJS_DOCKER node"
+  fi
+
+  RM_NODEJS_NPM=npm
+  if [ -n "$NO_USE_LOCAL_NPM" ] || ! $RM_NODEJS_NPM --version >/dev/null 2>&1; then
+    RM_NODEJS_NPM="$RM_NODEJS_DOCKER npm"
+  fi
+
+  (cd "$RM_NODEJS_DIR" && $RM_NODEJS_NPM version --no-git-tag-version --allow-same-version $V)
+
+  verbose "$RM_NODEJS_FILE_PATHNAME is now:"
+  verbose "$(cat "$RM_NODEJS_FILE_PATHNAME")"
 }
 #####
 ##### end nodejs package.json support
@@ -285,20 +347,26 @@ setVersion_nodejs() {
 #####
 ##### begin Scala SBT support
 #####
+RM_SCALA_SBT_DIR="${RM_SCALA_SBT_DIR:-$(pwd)}"
 RM_SCALA_SBT_FILE="${RM_SCALA_SBT_FILE:-build.sbt}"
 
 getVersion_sbt() {
-  cat "$RM_SCALA_SBT_FILE" | egrep "^version\s*\:\=.*" | $MATCH \".*\" | sed 's/"//g'
+  local RM_SCALA_SBT_FILE_PATHNAME="${1:-$RM_SCALA_SBT_DIR/$RM_SCALA_SBT_FILE}"
+
+  cat "$RM_SCALA_SBT_FILE_PATHNAME" | egrep "^version\s*\:\=.*" | $MATCH \".*\" | sed 's/"//g'
 }
 
 setVersion_sbt() {
   local V=$1
+  local RM_SCALA_SBT_FILE_PATHNAME="${2:-$RM_SCALA_SBT_DIR/$RM_SCALA_SBT_FILE}"
+  local FC="$(cat "$RM_SCALA_SBT_FILE_PATHNAME")"
 
-  local FC="$(cat "$RM_SCALA_SBT_FILE")"
   echo "$FC" \
   | sed "s/^version.*/version := \"$V\"/" \
-  > "$RM_SCALA_SBT_FILE"
-  verbose "$RM_SCALA_SBT_FILE is now: $(cat "$RM_SCALA_SBT_FILE")"
+  > "$RM_SCALA_SBT_FILE_PATHNAME"
+
+  verbose "$RM_SCALA_SBT_FILE_PATHNAME is now:"
+  verbose "$(cat "$RM_SCALA_SBT_FILE_PATHNAME")"
 }
 #####
 ##### end Scala SBT support
@@ -307,16 +375,23 @@ setVersion_sbt() {
 #####
 ##### begin VERSION file support
 #####
+RM_VERSION_DIR="${RM_VERSION_DIR:-$(pwd)}"
 RM_VERSION_FILE="${RM_VERSION_FILE:-VERSION}"
 
 getVersion_version() {
-  cat "$RM_VERSION_FILE" | xargs
+  local RM_VERSION_FILE_PATHNAME="${1:-$RM_VERSION_DIR/$RM_VERSION_FILE}"
+
+  cat "$RM_VERSION_FILE_PATHNAME" | xargs
 }
 
 setVersion_version() {
   local V=$1
-  echo "$V" > "$RM_VERSION_FILE"
-  verbose "$RM_VERSION_FILE is now: $(cat "$RM_VERSION_FILE")"
+  local RM_VERSION_FILE_PATHNAME="${2:-$RM_VERSION_DIR/$RM_VERSION_FILE}"
+
+  echo "$V" > "$RM_VERSION_FILE_PATHNAME"
+
+  verbose "$RM_VERSION_FILE_PATHNAME is now:"
+  verbose "$(cat "$RM_VERSION_FILE_PATHNAME")"
 }
 #####
 ##### end VERSION file support
@@ -325,9 +400,9 @@ setVersion_version() {
 usage() {
   echo "This script performs release commits, tags & branching.  Usage:"
 
-  printf "%s --tech tech1,tech2,... [options] $RM_PRE|$RM_RC|minor|patch\n \
+  printf "%s [--tech tech1,tech2,...] [options] $RM_PRE|$RM_RC|minor|patch\n \
   where options are as follows (last one wins):\n \
-  --tech|-t                           # required at least once, the technology types to release (comma-delimited list ok); choose from:\n \
+  --tech|-t                           # required or implied at least once, the technology types to release (comma-delimited list ok); choose from:\n \
                                       #  'helm' for Helm Chart (Chart.yaml),\n \
                                       #  'docker' for Docker Image (Dockerfile),\n \
                                       #  'nodejs' for Node.js (package.json),\n \
@@ -390,8 +465,16 @@ usage() {
     "$RM_VERSION_FILE"
 }
 
+debug() {
+  if [ -n "$RM_DEBUG" ]; then
+    echo "$*" >&2
+  fi
+}
+
 # process args
 while [ $# -gt 0 ]; do
+  debug "args: $*"
+
   case "$1" in
   --tech | -t)
     shift
@@ -522,7 +605,6 @@ while [ $# -gt 0 ]; do
   --nodejs-file)
     shift
     RM_NODEJS_PACKAGE_JSON="$1"
-    RM_NODEJS_PACKAGE_JSON_DIR="$(dirname "$RM_NODEJS_PACKAGE_JSON" | sed -E "s|^\.|$PWD|")"
     shift
     ;;
   --help | -h)
@@ -538,6 +620,12 @@ while [ $# -gt 0 ]; do
     break
     ;;
   esac
+done
+
+# purge args
+while [ $# -gt 0 ]; do
+  debug "purging: $*"
+  shift
 done
 
 # validations
