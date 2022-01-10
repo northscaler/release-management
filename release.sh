@@ -98,15 +98,7 @@ RM_DEFAULT_RC=${RM_DEFAULT_RC:-rc}
 RM_PRE=${RM_PRE:-$RM_DEFAULT_PRE}
 RM_RC=${RM_RC:-$RM_DEFAULT_RC}
 RM_VERBOSE=${RM_VERBOSE:-''}
-RM_CHERRY_PICK_RELEASE_COMMIT_TO_MAIN=1
-
-def() {
-  if [ -n "$1" ]; then
-    echo "$2"
-  else
-    echo "$1"
-  fi
-}
+RM_CHERRY_PICK_FIRST_RC_COMMIT_TO_MAIN=1
 
 #####
 ##### begin Helm Chart support
@@ -310,6 +302,9 @@ RM_NODEJS_PACKAGE_JSON="${RM_NODEJS_PACKAGE_JSON:-package.json}"
 
 getVersion_nodejs() {
   local RM_NODEJS_DIR="${1:-$RM_NODEJS_DIR}"
+  # make an absolute path
+  RM_NODEJS_DIR="$(cd "$RM_NODEJS_DIR" && pwd)"
+
   local RM_NODEJS_DOCKER="docker run --rm -i -v $RM_NODEJS_DIR:/cwd -w /cwd node"
   local RM_NODEJS_NODE=node
   if [ -n "$NO_USE_LOCAL_NODEJS" ] || ! $RM_NODEJS_NODE --version >/dev/null 2>&1; then
@@ -322,6 +317,8 @@ getVersion_nodejs() {
 setVersion_nodejs() {
   local V=$1
   local RM_NODEJS_DIR="${2:-$RM_NODEJS_DIR}"
+  # make an absolute path
+  RM_NODEJS_DIR="$(cd "$RM_NODEJS_DIR" && pwd)"
   local RM_NODEJS_FILE_PATHNAME="$RM_NODEJS_DIR/$RM_NODEJS_PACKAGE_JSON"
   local RM_NODEJS_DOCKER="docker run --rm -i -v $RM_NODEJS_DIR:/cwd -w /cwd node"
 
@@ -402,45 +399,54 @@ usage() {
 
   printf "%s [--tech tech1,tech2,...] [options] $RM_PRE|$RM_RC|minor|patch\n \
   where options are as follows (last one wins):\n \
-  --tech|-t                           # required or implied at least once, the technology types to release (comma-delimited list ok); choose from:\n \
-                                      #  'helm' for Helm Chart (Chart.yaml),\n \
-                                      #  'docker' for Docker Image (Dockerfile),\n \
-                                      #  'nodejs' for Node.js (package.json),\n \
-                                      #  'csharp' for C# (AssemblyInformationalVersion in AssemblyInfo.cs),\n \
-                                      #  'scala' for Scala (build.sbt),\n \
-                                      #  'gradle' for Gradle (build.gradle),\n \
-                                      #  'gradlekts' for Kotlin Gradle (build.gradle.kts),\n \
-                                      #  'maven' for Maven XML (pom.xml),\n \
-                                      #  'version' for plain text version file (VERSION),\n \
-  [--origin|-o origin]                # optional, git origin, default '%s'\n \
-  [--main|-m main]                    # optional, git main branch, default '%s'\n \
-  [--cherry-pick-to-main]             # optional, cherry pick release commit to main branch, default true\n \
-  [--no-cherry-pick-to-main]          # optional, don't cherry pick release commit to main branch, default false\n \
-  [--release-tag-prefix|-p prefix]    # optional, git release tag prefix, default '%s'\n \
-  [--release-tag-suffix|-s suffix]    # optional, git release tag suffix, default  '%s'\n \
-  [--release-branch-prefix|-P prefix] # optional, git release branch prefix, default '%s'\n \
-  [--release-branch-suffix|-S suffix] # optional, git release branch suffix, default '%s' ('.x' is common)\n \
-  [--git-commit-opts|-o opts]         # optional, git commit options, default '%s' ('--no-verify' is common)\n \
-  [--git-push-opts|-O opts]           # optional, git commit options, default '%s' ('--no-verify' is common)\n \
-  [--pre-release-token|-k token]      # optional, pre release token, default '%s'\n \
-  [--rc-release-token|-K token]       # optional, release candidate release token, default '%s'\n \
-  [--dev-qa]                          # optional, shortcut for '--main dev --pre-release-token dev --rc-release-token qa'\n \
-  [--trunk-qa]                        # optional, shortcut for '--main trunk --pre-release-token trunk --rc-release-token qa'\n \
-  [--alpha-beta]                      # optional, shortcut for '--main alpha --pre-release-token alpha --rc-release-token beta'\n \
-  [--pre-rc]                          # optional, shortcut for '--main master --pre-release-token pre --rc-release-token rc' (legacy behavior)\n \
-  [--helm-chart-dir chartDir]         # optional, chart directory, default cwd ('%s')\n \
-  [--helm-chart-file chartFile]       # optional, chart filename, default '%s'\n \
-  [--csharp-file csharpFile]          # optional, csharp filename, default '%s'\n \
-  [--gradle-file gradleFile]          # optional, gradle filename, default '%s'\n \
-  [--gradlekts-file gradlektsFile]    # optional, gradlekts filename, default '%s'\n \
-  [--docker-file dockerFile]          # optional, docker filename, default '%s'\n \
-  [--docker-file-version-label label] # optional, docker file version label, default '%s'\n \
-  [--maven-file mavenFile]            # optional, maven POM filename, default '%s'\n \
-  [--nodejs-file packageJson]         # optional, nodejs filename, default '%s'\n \
-  [--scala-file buildSbt]             # optional, scala filename, default '%s'\n \
-  [--version-file versionFile]        # optional, version filename, default '%s'\n \
-  [--verbose|-v]                      # optional, displays detailed progress\n \
-  [--help|-h]                         # optional, displays usage\n" \
+  --tech|-t                                 # required or implied at least once, the technology types to release (comma-delimited list ok); choose from:\n \
+                                            #  'helm' for Helm Chart (Chart.yaml),\n \
+                                            #  'docker' for Docker Image (Dockerfile),\n \
+                                            #  'nodejs' for Node.js (package.json),\n \
+                                            #  'csharp' for C# (AssemblyInformationalVersion in AssemblyInfo.cs),\n \
+                                            #  'scala' for Scala (build.sbt),\n \
+                                            #  'gradle' for Gradle (build.gradle),\n \
+                                            #  'gradlekts' for Kotlin Gradle (build.gradle.kts),\n \
+                                            #  'maven' for Maven XML (pom.xml),\n \
+                                            #  'version' for plain text version file (VERSION),\n \
+  [--origin|-o origin]                      # optional, git origin, default '%s'\n \
+  [--main|-m main]                          # optional, git main branch, default '%s'\n \
+  [--cherry-pick-to-main]                   # optional, cherry pick release commit to main branch, default true\n \
+  [--no-cherry-pick-to-main]                # optional, don't cherry pick release commit to main branch, default false\n \
+  [--release-tag-prefix|-p prefix]          # optional, git release tag prefix, default '%s'\n \
+  [--release-tag-suffix|-s suffix]          # optional, git release tag suffix, default  '%s'\n \
+  [--release-branch-prefix|-P prefix]       # optional, git release branch prefix, default '%s'\n \
+  [--release-branch-suffix|-S suffix]       # optional, git release branch suffix, default '%s' ('.x' is common)\n \
+  [--git-commit-opts|-o opts]               # optional, git commit options, default '%s' ('--no-verify' is common)\n \
+  [--git-push-opts|-O opts]                 # optional, git commit options, default '%s' ('--no-verify' is common)\n \
+  [--pre-release-token|-k token]            # optional, pre release token, default '%s'\n \
+  [--rc-release-token|-K token]             # optional, release candidate release token, default '%s'\n \
+  [--dev-qa]                                # optional, shortcut for '--main dev --pre-release-token dev --rc-release-token qa'\n \
+  [--trunk-qa]                              # optional, shortcut for '--main trunk --pre-release-token trunk --rc-release-token qa'\n \
+  [--alpha-beta]                            # optional, shortcut for '--main alpha --pre-release-token alpha --rc-release-token beta'\n \
+  [--pre-rc]                                # optional, shortcut for '--main master --pre-release-token pre --rc-release-token rc' (legacy behavior)\n \
+  [--helm-chart-dir chartDir]               # optional, chart directory, implies '--tech helm', default cwd ('%s')\n \
+  [--helm-chart-file chartFile]             # optional, chart filename, implies '--tech helm', default '%s'\n \
+  [--helm-chart-pathname chartPathnames]    # optional, colon-separated pathname(s) to chart files, implies '--tech helm', default '%s'\n \
+  [--csharp-file csharpFile]                # optional, csharp filename, implies '--tech csharp', default '%s'\n \
+  [--csharp-pathname csharpPathnames]       # optional, colon-separated pathname(s) to csharp files, implies '--tech csharp', default '%s'\n \
+  [--gradle-file gradleFile]                # optional, gradle filename, implies '--tech gradle', default '%s'\n \
+  [--gradle-pathname gradlePathnames]       # optional, colon-separated pathname(s) to gradle files, implies '--tech gradle', default '%s'\n \
+  [--gradlekts-file gradlektsFile]          # optional, gradlekts filename, implies '--tech gradlekts', default '%s'\n \
+  [--gradlekts-pathname gradlektsPathnames] # optional, colon-separated pathname(s) to gradlekts files, implies '--tech gradlekts', default '%s'\n \
+  [--docker-file dockerFile]                # optional, docker filename, implies '--tech docker', default '%s'\n \
+  [--docker-file-version-label label]       # optional, docker file version label, implies '--tech docker', default '%s'\n \
+  [--docker-pathname dockerPathnames]       # optional, colon-separated pathname(s) to docker files, implies '--tech docker', default '%s'\n \
+  [--maven-file mavenFile]                  # optional, maven POM filename, implies '--tech maven', default '%s'\n \
+  [--maven-pathname mavenPathnames]         # optional, colon-separated pathname(s) to maven files, implies '--tech maven', default '%s'\n \
+  [--nodejs-file packageJson]               # optional, nodejs filename, implies '--tech nodejs', default '%s'\n \
+  [--nodejs-pathname nodejsPathnames]       # optional, colon-separated pathname(s) to nodejs files, implies '--tech nodejs', default '%s'\n \
+  [--scala-file buildSbt]                   # optional, scala filename, implies '--tech scala', default '%s'\n \
+  [--scala-pathname scalaPathnames]         # optional, colon-separated pathname(s) to scala files, implies '--tech scala', default '%s'\n \
+  [--version-file versionFile]              # optional, version filename, implies '--tech version', default '%s'\n \
+  [--version-pathname versionPathnames]     # optional, colon-separated pathname(s) to version files, implies '--tech version', default '%s'\n \
+  [--verbose|-v]                            # optional, displays detailed progress\n \
+  [--help|-h]                               # optional, displays usage\n" \
     "$0" \
     "$RM_ORIGIN" \
     "$RM_MAIN" \
@@ -454,15 +460,24 @@ usage() {
     "$RM_RC" \
     "$RM_HELM_CHART_DIR" \
     "$RM_HELM_CHART_FILE" \
+    "$RM_HELM_CHART_DIR/$RM_HELM_CHART_FILE" \
     "$RM_CSHARP_FILE" \
+    "$RM_CSHARP_DIR/$RM_CSHARP_FILE" \
     "$RM_GRADLE_FILE" \
+    "$RM_GRADLE_DIR/$RM_GRADLE_FILE" \
     "$RM_GRADLE_KOTLIN_FILE" \
+    "$RM_GRADLE_KOTLIN_DIR/$RM_GRADLE_KOTLIN_FILE" \
     "$RM_DOCKER_FILE" \
     "$RM_DOCKER_VERSION_LABEL" \
+    "$RM_DOCKER_DIR/$RM_DOCKER_FILE" \
     "$RM_MAVEN_FILE" \
+    "$RM_MAVEN_DIR/$RM_MAVEN_FILE" \
     "$RM_NODEJS_PACKAGE_JSON" \
+    "$RM_NODEJS_DIR/$RM_NODEJS_PACKAGE_JSON_FILE" \
     "$RM_SCALA_SBT_FILE" \
-    "$RM_VERSION_FILE"
+    "$RM_SCALA_DIR/$RM_SCALA_FILE" \
+    "$RM_VERSION_FILE" \
+    "$RM_VERSION_DIR/$RM_VERSION_FILE"
 }
 
 debug() {
@@ -551,61 +566,141 @@ while [ $# -gt 0 ]; do
     ;;
   --cherry-pick-to-main)
     shift
-    RM_CHERRY_PICK_RELEASE_COMMIT_TO_MAIN=1
+    RM_CHERRY_PICK_FIRST_RC_COMMIT_TO_MAIN=1
     ;;
   --no-cherry-pick-to-main)
     shift
-    RM_CHERRY_PICK_RELEASE_COMMIT_TO_MAIN=
+    RM_CHERRY_PICK_FIRST_RC_COMMIT_TO_MAIN=
     ;;
   --helm-chart-dir)
     shift
     RM_HELM_CHART_DIR="$1"
     shift
+    RM_PATHNAMES_chart="" # negates any prior --helm-chart-pathname args
+    RM_TECH="$RM_TECH,helm"
     ;;
   --helm-chart-file)
     shift
     RM_HELM_CHART_FILE="$1"
     shift
+    RM_PATHNAMES_chart="" # negates any prior --helm-chart-pathname args
+    RM_TECH="$RM_TECH,helm"
+    ;;
+  --helm-chart-pathname)
+    shift
+    RM_PATHNAMES_chart=":$RM_PATHNAMES_chart:$1"
+    shift
+    RM_TECH="$RM_TECH,helm"
     ;;
   --csharp-file)
     shift
     RM_CSHARP_FILE="$1"
     shift
+    RM_PATHNAMES_csharp="" # negates any prior --csharp-pathname args
+    RM_TECH="$RM_TECH,csharp"
+    ;;
+  --csharp-pathname)
+    shift
+    RM_PATHNAMES_csharp=":$RM_PATHNAMES_csharp:$1:"
+    shift
+    RM_TECH="$RM_TECH,csharp"
     ;;
   --gradle-file)
     shift
     RM_GRADLE_FILE="$1"
     shift
+    RM_PATHNAMES_gradle="" # negates any prior --gradle-pathname args
+    RM_TECH="$RM_TECH,gradle"
+    ;;
+  --gradle-pathname)
+    shift
+    RM_PATHNAMES_gradle="$RM_PATHNAMES_gradle:$1:"
+    shift
+    RM_TECH="$RM_TECH,gradle"
     ;;
   --gradlekts-file)
     shift
     RM_GRADLE_KOTLIN_FILE="$1"
     shift
+    RM_PATHNAMES_gradlekts="" # negates any prior --gradlekts-pathname args
+    RM_TECH="$RM_TECH,gradlekts"
+    ;;
+  --gradlekts-pathname)
+    shift
+    RM_PATHNAMES_gradlekts="$RM_PATHNAMES_gradlekts:$1:"
+    shift
+    RM_TECH="$RM_TECH,gradlekts"
     ;;
   --docker-file)
     shift
     RM_DOCKER_FILE="$1"
     shift
+    RM_PATHNAMES_docker="" # negates any prior --docker-pathname args
+    RM_TECH="$RM_TECH,docker"
+    ;;
+  --docker-pathname)
+    shift
+    RM_PATHNAMES_docker=":$RM_PATHNAMES_docker:$1:"
+    shift
+    RM_TECH="$RM_TECH,docker"
     ;;
   --docker-file-version-label)
     shift
     RM_DOCKER_VERSION_LABEL="$1"
     shift
+    RM_TECH="$RM_TECH,docker"
     ;;
   --maven-file)
     shift
     RM_MAVEN_FILE="$1"
     shift
+    RM_PATHNAMES_maven="" # negates any prior --maven-pathname args
+    RM_TECH="$RM_TECH,maven"
+    ;;
+  --maven-pathname)
+    shift
+    RM_PATHNAMES_maven=":$RM_PATHNAMES_maven:$1:"
+    shift
+    RM_TECH="$RM_TECH,maven"
     ;;
   --scala-file)
     shift
     RM_SCALA_SBT_FILE="$1"
     shift
+    RM_PATHNAMES_scala="" # negates any prior --scala-pathname args
+    RM_TECH="$RM_TECH,scala"
+    ;;
+  --scala-pathname)
+    shift
+    RM_PATHNAMES_scala=":$RM_PATHNAMES_scala:$1:"
+    shift
+    RM_TECH="$RM_TECH,scala"
     ;;
   --nodejs-file)
     shift
     RM_NODEJS_PACKAGE_JSON="$1"
     shift
+    RM_PATHNAMES_nodejs="" # negates any prior --nodejs-pathname args
+    RM_TECH="$RM_TECH,nodejs"
+    ;;
+  --nodejs-pathname)
+    shift
+    RM_PATHNAMES_nodejs=":$RM_PATHNAMES_nodejs:$1:"
+    shift
+    RM_TECH="$RM_TECH,nodejs"
+    ;;
+  --version-file)
+    shift
+    RM_VERSION_FILE="$1"
+    shift
+    RM_PATHNAMES_version=""
+    RM_TECH="$RM_TECH,version"
+    ;;
+  --version-pathname)
+    shift
+    RM_PATHNAMES_version=":$RM_PATHNAMES_version:$1:"
+    shift
+    RM_TECH="$RM_TECH,version"
     ;;
   --help | -h)
     usage >&2
@@ -628,12 +723,40 @@ while [ $# -gt 0 ]; do
   shift
 done
 
+if [ -n "$RM_PATHNAMES_chart" ]; then
+  RM_PATHNAMES_chart="$RM_HELM_CHART_DIR/$RM_HELM_CHART_FILE"
+fi
+if [ -n "$RM_PATHNAMES_csharp" ]; then
+  RM_PATHNAMES_csharp="$RM_CSHARP_DIR/$RM_CSHARP_FILE"
+fi
+if [ -n "$RM_PATHNAMES_gradle" ]; then
+  RM_PATHNAMES_gradle="$RM_GRADLE_DIR/$RM_GRADLE_FILE"
+fi
+if [ -n "$RM_PATHNAMES_gradlekts" ]; then
+  RM_PATHNAMES_gradlekts="$RM_GRADLE_KOTLIN_DIR/$RM_GRADLE_KOTLIN_FILE"
+fi
+if [ -n "$RM_PATHNAMES_docker" ]; then
+  RM_PATHNAMES_docker="$RM_DOCKER_DIR/$RM_DOCKER_FILE"
+fi
+if [ -n "$RM_PATHNAMES_maven" ]; then
+  RM_PATHNAMES_maven="$RM_MAVEN_DIR/$RM_MAVEN_FILE"
+fi
+if [ -n "$RM_PATHNAMES_scala" ]; then
+  RM_PATHNAMES_scala="$RM_SCALA_SBT_DIR/$RM_SCALA_SBT_FILE"
+fi
+if [ -n "$RM_PATHNAMES_nodejs" ]; then
+  RM_PATHNAMES_nodejs="$RM_NODEJS_DIR/$RM_NODEJS_PACKAGE_JSON_FILE"
+fi
+if [ -n "$RM_PATHNAMES_version" ]; then
+  RM_PATHNAMES_version="$RM_VERSION_DIR/$RM_VERSION_FILE"
+fi
+
 # validations
 
 # ensure at least one tech given
-RM_TECHNOLOGIES="$(echo -n "$RM_TECH" | tr ',' ' ' | xargs)"
+RM_TECHNOLOGIES="$(echo -n "$RM_TECH" | tr ',' '\n' | uniq | xargs)"
 if [ -z "$RM_TECHNOLOGIES" ]; then
-  echo "ERROR: no technologies given" >&2
+  echo "ERROR: no technologies given or implied" >&2
   usage >&2
   exit $RM_ERR_INVOCATION
 fi
@@ -666,8 +789,13 @@ if [ "$RM_PRE" \> "$RM_RC" ]; then
 fi
 
 setVersions() {
-  for T in $RM_TECHNOLOGIES; do
-    setVersion_$T $1
+  for t in $RM_TECHNOLOGIES; do
+    ORIG_IFS="$IFS"
+    IFS=':'
+    for p in $(eval "echo \$RM_PATHNAMES_$t"); do
+      setVersion_$t $1 "$p"
+    done
+    IFS="$ORIG_IFS"
   done
 }
 
@@ -676,16 +804,25 @@ verbose "INFO: invocation ok; checking required preconditions"
 git pull $RM_ORIGIN
 
 # check that all versions are exactly the same
-for T in $RM_TECHNOLOGIES; do
-  V="$(getVersion_$T)"
-  if [ -n "$V_LAST" ] && [ "$V_LAST" != "$V" ]; then
-    echo "ERROR: versions among different technology files differ: $T is at $V, but $T_LAST is at $V_LAST" >&2
-    exit $RM_ERR_VERSIONS
-  fi
-  V_LAST="$V"
-  T_LAST="$T"
+for t in $RM_TECHNOLOGIES; do
+  ORIG_IFS="$IFS"
+  IFS=':'
+  for p in $(eval "echo \$RM_PATHNAMES_$t"); do
+    v="$(getVersion_$t "$p")"
+    if [ -n "$v_last" ] && [ "$v_last" != "$v" ]; then
+      echo "ERROR: versions among different version files differ:" >&2
+      echo "$t is at $v in $p" >&2
+      echo "but" >&2
+      echo "$t_last is at $v_last in $p_last" >&2
+      exit $RM_ERR_VERSIONS
+    fi
+    v_last="$v"
+    t_last="$t"
+    p_last="$p"
+  done
+  IFS="$ORIG_IFS"
 done
-RM_VERSION="$V_LAST"
+RM_VERSION="$v_last"
 
 if ! git diff --exit-code --no-patch; then
   echo 'ERROR: you have modified tracked files; only release from clean directories!' >&2
@@ -709,7 +846,7 @@ else
 fi
 
 RM_BRANCH="$(git status | head -n 1 | awk '{ print $3 }')"
-if ! $MATCH "^($RM_MAIN|$RM_BRANCH_PREFIX[0-9]{1,}\.[0-9]{1,}$RM_BRANCH_SUFFIX)$" "$RM_BRANCH"; then # it is not a main or a release branch
+if ! $MATCH "^($RM_MAIN|${RM_BRANCH_PREFIX}[0-9]{1,}\.[0-9]{1,}$RM_BRANCH_SUFFIX)$" "$RM_BRANCH"; then # it is not a main or a release branch
   echo "ERROR: you can only release from the $RM_MAIN branch or release branches! You are currently on $RM_BRANCH" >&2
   exit $RM_ERR_GIT_STATE
 else
@@ -811,7 +948,7 @@ if [ "$RM_BRANCH" == "$RM_MAIN" ]; then # this will be either an rc release resu
       git checkout $RM_MAIN
       verbose "INFO: checked out '$RM_MAIN'"
 
-      if [ -n "$RM_CHERRY_PICK_RELEASE_COMMIT_TO_MAIN" ]; then
+      if [ -n "$RM_CHERRY_PICK_FIRST_RC_COMMIT_TO_MAIN" ]; then
         git cherry-pick -x $RM_NEW_RELEASE_BRANCH # cherry pick from release branch to get release candidate commit in master
         verbose "INFO: cherry-picked '$RM_NEW_RELEASE_BRANCH' '$RM_RC' commit into '$RM_MAIN'"
       fi
