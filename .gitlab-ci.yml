@@ -16,3 +16,4 @@ build:
     - git config --global user.name "Release Management"
     - apk add bash
     - bash -c ./test/polyrepos/test-all.sh
+    - bash -c ./test/monorepo/test.sh
