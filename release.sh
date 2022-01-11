@@ -101,19 +101,17 @@ RM_CHERRY_PICK_FIRST_RC_COMMIT_TO_MAIN=1
 ##### begin Helm Chart support
 #####
 RM_HELM_CHART_DIR=${RM_HELM_CHART_DIR:-$(pwd)}
-RM_HELM_CHART_FILE="${RM_HELM_CHART_FILE:-Chart.yaml}"
 
 getVersion_helm() {
-  set -x
-  local RM_HELM_CHART_FILE_PATHNAME="${1:-$RM_HELM_CHART_DIR/$RM_HELM_CHART_FILE}"
+  local RM_HELM_CHART_DIR_PATHNAME="$1"
 
-  cat "$RM_HELM_CHART_FILE_PATHNAME" | eval "$YMLX this.version"
-  set +x
+  eval "$YMLX this.version" < "$RM_HELM_CHART_DIR_PATHNAME/Chart.yaml"
 }
 
 setVersion_helm() {
   local V=$1
-  local RM_HELM_CHART_FILE_PATHNAME="${2:-$RM_HELM_CHART_DIR/$RM_HELM_CHART_FILE}"
+  local RM_HELM_CHART_DIR_PATHNAME="$2"
+  local RM_HELM_CHART_FILE_PATHNAME="$RM_HELM_CHART_DIR_PATHNAME/Chart.yaml"
   local FC="$(cat $RM_HELM_CHART_FILE_PATHNAME)"
 
   echo "$FC" \
@@ -135,7 +133,7 @@ RM_CSHARP_FILE="${RM_CSHARP_FILE:-AssemblyInfo.cs}"
 RM_CSHARP_ENTRY="${RM_CSHARP_ENTRY:-AssemblyInformationalVersion}"
 
 getVersion_csharp() {
-  local RM_CSHARP_FILE_PATHNAME="${1:-$RM_CSHARP_DIR/$RM_CSHARP_FILE}"
+  local RM_CSHARP_FILE_PATHNAME="$1"
 
   cat "$RM_CSHARP_FILE_PATHNAME" | grep -E "$RM_CSHARP_ENTRY" | eval "$MATCH '(\d+\.\d+\.\d+(-.+\.\d+)?)'" | awk '{ print $1 }'
 }
@@ -145,7 +143,7 @@ setVersion_csharp() {
   local AFV="$VER.0"
   local AV="$VER.*"
 
-  local RM_CSHARP_FILE_PATHNAME="${2:-$RM_CSHARP_DIR/$RM_CSHARP_FILE}"
+  local RM_CSHARP_FILE_PATHNAME="$2"
   local FC="$(cat "$RM_CSHARP_FILE_PATHNAME")"
 
   echo "$FC" \
@@ -168,13 +166,13 @@ RM_GRADLE_DIR="${RM_GRADLE_DIR:-$(pwd)}"
 RM_GRADLE_FILE="${RM_GRADLE_FILE:-build.gradle}"
 
 getVersion_gradle() {
-  local RM_GRADLE_FILE_PATHNAME="${1:-$RM_GRADLE_DIR/$RM_GRADLE_FILE}"
+  local RM_GRADLE_FILE_PATHNAME="$1"
 
   cat "$RM_GRADLE_FILE_PATHNAME" | grep -E "^version" | eval "$MATCH \'.*\'" | sed "s/'//g"
 }
 
 setVersion_gradle() {
-  local RM_GRADLE_FILE_PATHNAME="${2:-$RM_GRADLE_DIR/$RM_GRADLE_FILE}"
+  local RM_GRADLE_FILE_PATHNAME="$2"
   local V=$1
   local FC="$(cat "$RM_GRADLE_FILE")"
 
@@ -196,7 +194,7 @@ RM_GRADLE_KOTLIN_DIR="${RM_GRADLE_KOTLIN_DIR:-$(pwd)}"
 RM_GRADLE_KOTLIN_FILE="${RM_GRADLE_KOTLIN_FILE:-build.gradle.kts}"
 
 getVersion_gradlekts() {
-  local RM_GRADLE_KOTLIN_FILE_PATHNAME="${1:-$RM_GRADLE_KOTLIN_DIR/$RM_GRADLE_KOTLIN_FILE}"
+  local RM_GRADLE_KOTLIN_FILE_PATHNAME="$1"
 
   cat "$RM_GRADLE_KOTLIN_FILE_PATHNAME" | grep -E "^version" | grep -Eo "['\"].*['\"]" | tr '"' ' ' | tr "'" ' ' | xargs
 }
@@ -205,7 +203,7 @@ getVersion_gradlekts() {
 setVersion_gradlekts() {
   local V=$1
   local FC="$(cat "$RM_GRADLE_KOTLIN_FILE")"
-  local RM_GRADLE_KOTLIN_FILE_PATHNAME="${2:-$RM_GRADLE_KOTLIN_DIR/$RM_GRADLE_KOTLIN_FILE}"
+  local RM_GRADLE_KOTLIN_FILE_PATHNAME="$2"
 
   echo "$FC" \
   | sed "s/^version.*/version = \"$V\"/" \
@@ -226,19 +224,16 @@ RM_DOCKER_FILE="${RM_DOCKER_FILE:-Dockerfile}"
 RM_DOCKER_VERSION_LABEL="${RM_DOCKER_VERSION_LABEL:-version}"
 
 getVersion_docker() {
-  set -x
-  local RM_DOCKER_FILE_PATHNAME="${1:-$RM_DOCKER_DIR/$RM_DOCKER_FILE}"
+  local RM_DOCKER_FILE_PATHNAME="$1"
 
   echo "$(grep -E '^LABEL' "$RM_DOCKER_FILE_PATHNAME" | grep -Eo "$RM_DOCKER_VERSION_LABEL=\"?[0-9]+\.[0-9]+\.[0-9]+(-[^ \"]*)?\"?" | cut -d'=' -f2 | sed 's/"//g')"
-  set +x
 }
 
 setVersion_docker() {
-  set -x
   local V=$1
   local label
   local first=true
-  local RM_DOCKER_FILE_PATHNAME="${2:-$RM_DOCKER_DIR/$RM_DOCKER_FILE}"
+  local RM_DOCKER_FILE_PATHNAME="$2"
   local lines
 
   printf "$(cat "$RM_DOCKER_FILE_PATHNAME")\n" | while read line; do
@@ -261,7 +256,6 @@ setVersion_docker() {
 
   verbose "$RM_DOCKER_FILE_PATHNAME is now:"
   verbose "$(cat cat "$RM_DOCKER_FILE_PATHNAME")"
-  set +x
 }
 #####
 ##### end Docker image support
@@ -274,20 +268,20 @@ RM_MAVEN_DIR="${RM_MAVEN_DIR:-$(pwd)}"
 RM_MAVEN_FILE="${RM_MAVEN_FILE:-pom.xml}"
 
 getVersion_maven() {
-  local RM_MAVEN_FILE_PATHNAME="${1:-$RM_MAVEN_DIR/$RM_MAVEN_FILE}"
+  local RM_MAVEN_FILE_PATHNAME="$1"
 
-  cat "$RM_MAVEN_FILE_PATHNAME" | eval "$XMLSTARLET sel -N x=http://maven.apache.org/POM/4.0.0 -t -v /x:project/x:version -"
+  eval "$XMLSTARLET sel -N x=http://maven.apache.org/POM/4.0.0 -t -v /x:project/x:version -" < "$RM_MAVEN_FILE_PATHNAME"
 }
 
 setVersion_maven() {
   local V=$1
-  local RM_MAVEN_FILE_PATHNAME="${2:-$RM_MAVEN_DIR/$RM_MAVEN_FILE}"
+  local RM_MAVEN_FILE_PATHNAME="$2"
 
-  cat "$RM_MAVEN_FILE_PATHNAME" | eval "$XMLSTARLET ed -P -N x=http://maven.apache.org/POM/4.0.0 -u /x:project/x:version -v $V" > "$RM_MAVEN_FILE_PATHNAME.tmp"
+  eval "$XMLSTARLET ed -P -N x=http://maven.apache.org/POM/4.0.0 -u /x:project/x:version -v $V" > "$RM_MAVEN_FILE_PATHNAME.tmp" < "$RM_MAVEN_FILE_PATHNAME"
   mv "$RM_MAVEN_FILE_PATHNAME.tmp" "$RM_MAVEN_FILE_PATHNAME"
 
-  verbose "$RM_MAVEN_FILE is now:"
-  verbose "$(cat "$RM_MAVEN_FILE")"
+  verbose "$RM_MAVEN_FILE_PATHNAME is now:"
+  verbose "$(cat "$RM_MAVEN_FILE_PATHNAME")"
 }
 #####
 ##### end Maven pom.xml support
@@ -338,14 +332,14 @@ RM_SCALA_SBT_DIR="${RM_SCALA_SBT_DIR:-$(pwd)}"
 RM_SCALA_SBT_FILE="${RM_SCALA_SBT_FILE:-build.sbt}"
 
 getVersion_sbt() {
-  local RM_SCALA_SBT_FILE_PATHNAME="${1:-$RM_SCALA_SBT_DIR/$RM_SCALA_SBT_FILE}"
+  local RM_SCALA_SBT_FILE_PATHNAME="$1"
 
   cat "$RM_SCALA_SBT_FILE_PATHNAME" | grep -E "^version\s*\:\=.*" | eval "$MATCH \".*\"" | sed 's/"//g'
 }
 
 setVersion_sbt() {
   local V=$1
-  local RM_SCALA_SBT_FILE_PATHNAME="${2:-$RM_SCALA_SBT_DIR/$RM_SCALA_SBT_FILE}"
+  local RM_SCALA_SBT_FILE_PATHNAME="$2"
   local FC="$(cat "$RM_SCALA_SBT_FILE_PATHNAME")"
 
   echo "$FC" \
@@ -366,14 +360,14 @@ RM_VERSION_DIR="${RM_VERSION_DIR:-$(pwd)}"
 RM_VERSION_FILE="${RM_VERSION_FILE:-VERSION}"
 
 getVersion_version() {
-  local RM_VERSION_FILE_PATHNAME="${1:-$RM_VERSION_DIR/$RM_VERSION_FILE}"
+  local RM_VERSION_FILE_PATHNAME="$1"
 
-  cat "$RM_VERSION_FILE_PATHNAME" | xargs
+  xargs < "$RM_VERSION_FILE_PATHNAME"
 }
 
 setVersion_version() {
   local V=$1
-  local RM_VERSION_FILE_PATHNAME="${2:-$RM_VERSION_DIR/$RM_VERSION_FILE}"
+  local RM_VERSION_FILE_PATHNAME="$2"
 
   echo "$V" > "$RM_VERSION_FILE_PATHNAME"
 
@@ -416,8 +410,7 @@ usage() {
   [--alpha-beta]                            # optional, shortcut for '--main alpha --pre-release-token alpha --rc-release-token beta'\n \
   [--pre-rc]                                # optional, shortcut for '--main master --pre-release-token pre --rc-release-token rc' (legacy behavior)\n \
   [--helm-chart-dir chartDir]               # optional, chart directory, implies '--tech helm', default cwd ('%s')\n \
-  [--helm-chart-file chartFile]             # optional, chart filename, implies '--tech helm', default '%s'\n \
-  [--helm-chart-pathname chartPathnames]    # optional, colon-separated pathname(s) to chart files, implies '--tech helm', default '%s'\n \
+  [--helm-chart-dir-pathname chartPathnames]# optional, colon-separated pathname(s) to chart directories, implies '--tech helm', default '%s'\n \
   [--csharp-file csharpFile]                # optional, csharp filename, implies '--tech csharp', default '%s'\n \
   [--csharp-pathname csharpPathnames]       # optional, colon-separated pathname(s) to csharp files, implies '--tech csharp', default '%s'\n \
   [--gradle-file gradleFile]                # optional, gradle filename, implies '--tech gradle', default '%s'\n \
@@ -448,8 +441,7 @@ usage() {
     "$RM_PRE" \
     "$RM_RC" \
     "$RM_HELM_CHART_DIR" \
-    "$RM_HELM_CHART_FILE" \
-    "$RM_HELM_CHART_DIR/$RM_HELM_CHART_FILE" \
+    "$RM_HELM_CHART_DIR" \
     "$RM_CSHARP_FILE" \
     "$RM_CSHARP_DIR/$RM_CSHARP_FILE" \
     "$RM_GRADLE_FILE" \
@@ -564,17 +556,19 @@ while [ $# -gt 0 ]; do
     shift
     RM_HELM_CHART_DIR="$1"
     shift
-    RM_PATHNAMES_chart="" # negates any prior --helm-chart-pathname args
-    RM_TECH="$RM_TECH,helm"
-    ;;
-  --helm-chart-file)
-    shift
-    RM_HELM_CHART_FILE="$1"
-    shift
     RM_PATHNAMES_helm="" # negates any prior --helm-chart-pathname args
     RM_TECH="$RM_TECH,helm"
     ;;
-  --helm-chart-pathname)
+  --helm-chart-file) # deprecated because filename "Chart.yaml" is not configurable in node.js
+    shift
+    RM_HELM_CHART_FILE="$1"
+    shift
+    RM_HELM_CHART_DIR="$(realpath "$(dirname "$RM_HELM_CHART_FILE")")"
+    echo "WARN: option --helm-chart-file is deprecated; assuming '--helm-chart-dir $RM_HELM_CHART_DIR' instead" >&2
+    RM_PATHNAMES_helm=":$RM_HELM_CHART_DIR:"
+    RM_TECH="$RM_TECH,helm"
+    ;;
+  --helm-chart-dir-pathname)
     shift
     RM_PATHNAMES_helm=":$RM_PATHNAMES_helm:$1"
     shift

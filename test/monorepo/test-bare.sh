@@ -20,7 +20,7 @@ OPTS="\
   --docker-pathname docker/project-1/Dockerfile:docker/project-2/project-2.Dockerfile \
   --gradle-pathname gradle/project-1/build.gradle:gradle/project-2/build.2.gradle \
   --gradlekts-pathname gradlekts/project-1/build.gradle.kts:gradlekts/project-2/build.gradle.2.kts \
-  --helm-pathname helm/project-1/release-test-chart/Chart.yaml:helm/project-2/release-test-chart2/Chart.yaml \
+  --helm-dir-pathname helm/project-1/release-test-chart:helm/project-2/release-test-chart2 \
   --maven-pathname maven/project-1/pom.xml:maven/project-2/pom.2.xml \
   --nodejs-dir-pathname nodejs/project-1:nodejs/project-2 \
   --scala-pathname scala/project-1/build.sbt:scala/project-2/build.2.sbt \

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-set -ex
+set -e
 
 THIS_ABSPATH="$(cd "$(dirname "$0")"; pwd)"
 
