@@ -382,8 +382,8 @@ usage() {
   echo "This script performs release commits, tags & branching.  Usage:"
 
   printf "%s [--tech tech1,tech2,...] [options] $RM_PRE|$RM_RC|minor|patch\n \
-  where options are as follows (last one wins):\n \
-  --tech|-t                                 # required or implied at least once, the technology types to release (comma-delimited list ok); choose from:\n \
+  where options are as follows:\n \
+  --tech|-t                                 # required or implied by other arguments at least once, the technology types to release (comma-delimited list ok); choose from:\n \
                                             #  'helm' for Helm Chart (Chart.yaml),\n \
                                             #  'docker' for Docker Image (Dockerfile),\n \
                                             #  'nodejs' for Node.js (package.json),\n \
@@ -393,40 +393,32 @@ usage() {
                                             #  'gradlekts' for Kotlin Gradle (build.gradle.kts),\n \
                                             #  'maven' for Maven XML (pom.xml),\n \
                                             #  'version' for plain text version file (VERSION),\n \
-  [--origin|-o origin]                      # optional, git origin, default '%s'\n \
-  [--main|-m main]                          # optional, git main branch, default '%s'\n \
-  [--cherry-pick-to-main]                   # optional, cherry pick release commit to main branch, default true\n \
-  [--no-cherry-pick-to-main]                # optional, don't cherry pick release commit to main branch, default false\n \
-  [--release-tag-prefix|-p prefix]          # optional, git release tag prefix, default '%s'\n \
-  [--release-tag-suffix|-s suffix]          # optional, git release tag suffix, default  '%s'\n \
-  [--release-branch-prefix|-P prefix]       # optional, git release branch prefix, default '%s'\n \
-  [--release-branch-suffix|-S suffix]       # optional, git release branch suffix, default '%s' ('.x' is common)\n \
-  [--git-commit-opts|-o opts]               # optional, git commit options, default '%s' ('--no-verify' is common)\n \
-  [--git-push-opts|-O opts]                 # optional, git commit options, default '%s' ('--no-verify' is common)\n \
-  [--pre-release-token|-k token]            # optional, pre release token, default '%s'\n \
-  [--rc-release-token|-K token]             # optional, release candidate release token, default '%s'\n \
-  [--dev-qa]                                # optional, shortcut for '--main dev --pre-release-token dev --rc-release-token qa'\n \
-  [--trunk-qa]                              # optional, shortcut for '--main trunk --pre-release-token trunk --rc-release-token qa'\n \
-  [--alpha-beta]                            # optional, shortcut for '--main alpha --pre-release-token alpha --rc-release-token beta'\n \
-  [--pre-rc]                                # optional, shortcut for '--main master --pre-release-token pre --rc-release-token rc' (legacy behavior)\n \
-  [--helm-chart-dir chartDir]               # optional, chart directory, implies '--tech helm', default cwd ('%s')\n \
-  [--helm-chart-dir-pathname chartPathnames]# optional, colon-separated pathname(s) to chart directories, implies '--tech helm', default '%s'\n \
-  [--csharp-file csharpFile]                # optional, csharp filename, implies '--tech csharp', default '%s'\n \
-  [--csharp-pathname csharpPathnames]       # optional, colon-separated pathname(s) to csharp files, implies '--tech csharp', default '%s'\n \
-  [--gradle-file gradleFile]                # optional, gradle filename, implies '--tech gradle', default '%s'\n \
-  [--gradle-pathname gradlePathnames]       # optional, colon-separated pathname(s) to gradle files, implies '--tech gradle', default '%s'\n \
-  [--gradlekts-file gradlektsFile]          # optional, gradlekts filename, implies '--tech gradlekts', default '%s'\n \
-  [--gradlekts-pathname gradlektsPathnames] # optional, colon-separated pathname(s) to gradlekts files, implies '--tech gradlekts', default '%s'\n \
-  [--docker-file dockerFile]                # optional, docker filename, implies '--tech docker', default '%s'\n \
-  [--docker-file-version-label label]       # optional, docker file version label, implies '--tech docker', default '%s'\n \
-  [--docker-pathname dockerPathnames]       # optional, colon-separated pathname(s) to docker files, implies '--tech docker', default '%s'\n \
-  [--maven-file mavenFile]                  # optional, maven POM filename, implies '--tech maven', default '%s'\n \
-  [--maven-pathname mavenPathnames]         # optional, colon-separated pathname(s) to maven files, implies '--tech maven', default '%s'\n \
-  [--nodejs-dir-pathname nodejsPathnames]   # optional, colon-separated pathname(s) to nodejs directories, implies '--tech nodejs', default '%s'\n \
-  [--scala-file buildSbt]                   # optional, scala filename, implies '--tech scala', default '%s'\n \
-  [--scala-pathname scalaPathnames]         # optional, colon-separated pathname(s) to scala files, implies '--tech scala', default '%s'\n \
-  [--version-file versionFile]              # optional, version filename, implies '--tech version', default '%s'\n \
-  [--version-pathname versionPathnames]     # optional, colon-separated pathname(s) to version files, implies '--tech version', default '%s'\n \
+  [--origin|-o origin]                      # optional, git origin, default '%s' (if given multiple times, last one wins)\n \
+  [--main|-m main]                          # optional, git main branch, default '%s' (if given multiple times, last one wins)\n \
+  [--cherry-pick-to-main]                   # optional, cherry pick first RC release commit to main branch, default true (if given multiple times, last one wins)\n \
+  [--no-cherry-pick-to-main]                # optional, don't cherry pick first RC release commit to main branch, default false (if given multiple times, last one wins)\n \
+  [--release-tag-prefix|-p prefix]          # optional, git release tag prefix, default '%s' (if given multiple times, last one wins)\n \
+  [--release-tag-suffix|-s suffix]          # optional, git release tag suffix, default  '%s' (if given multiple times, last one wins)\n \
+  [--release-branch-prefix|-P prefix]       # optional, git release branch prefix, default '%s' (if given multiple times, last one wins)\n \
+  [--release-branch-suffix|-S suffix]       # optional, git release branch suffix, default '%s' (if given multiple times, last one wins)\n \
+  [--git-commit-opts|-o opts]               # optional, git commit options ('--no-verify' is common), default '%s' (if given multiple times, last one wins)\n \
+  [--git-push-opts|-O opts]                 # optional, git push options ('--no-verify' is common), default '%s' (if given multiple times, last one wins)\n \
+  [--pre-release-token|-k token]            # optional, pre release token, default '%s' (if given multiple times, last one wins)\n \
+  [--rc-release-token|-K token]             # optional, release candidate release token, default '%s' (if given multiple times, last one wins)\n \
+  [--dev-qa]                                # optional, shortcut for '--main dev --pre-release-token dev --rc-release-token qa' (if other shortcut options given multiple times, last one wins)\n \
+  [--trunk-qa]                              # optional, shortcut for '--main trunk --pre-release-token trunk --rc-release-token qa' (if other shortcut options given multiple times, last one wins)\n \
+  [--alpha-beta]                            # optional, shortcut for '--main alpha --pre-release-token alpha --rc-release-token beta' (if other shortcut options given multiple times, last one wins)\n \
+  [--pre-rc]                                # optional, shortcut for legacy behavior of '--main master --pre-release-token pre --rc-release-token rc' (if other shortcut options given multiple times, last one wins)\n \
+  [--helm-chart-dir chartDir]               # optional, chart directory (option allowed multiple times) or colon-separated pathnames to chart directories, if given implies '--tech helm', default cwd ('%s')\n \
+  [--csharp-file csharpFile]                # optional, csharp filename (option allowed multiple times) or colon-separated pathnames to csharp filenames, if given implies '--tech csharp', default '%s'\n \
+  [--gradle-file gradleFile]                # optional, gradle filename (option allowed multiple times) or colon-separated pathnames to gradle filenames, if given implies '--tech gradle', default '%s'\n \
+  [--gradlekts-file gradlektsFile]          # optional, gradlekts filename (option allowed multiple times) or colon-separated pathnames to gradlekts filenames, if given implies '--tech gradlekts', default '%s'\n \
+  [--docker-file dockerFile]                # optional, docker filename (option allowed multiple times) or colon-separated pathnames to docker filenames, if given implies '--tech docker', default '%s'\n \
+  [--docker-file-version-label label]       # optional, docker file version label, if given implies '--tech docker', default '%s'\n \
+  [--maven-file mavenFile]                  # optional, maven POM filename (option allowed multiple times) or colon-separated pathnames to maven POM filenames, if given implies '--tech maven', default '%s'\n \
+  [--nodejs-dir nodejsDir]                  # optional, nodejs project directory (option allowed multiple times) or colon-separated pathnames to nodejs project directories, if given implies '--tech nodejs', default '%s'\n \
+  [--scala-file buildSbt]                   # optional, scala SBT filename (option allowed multiple times) or colon-separated pathnames to scala SBT filenames, if given implies '--tech scala', default '%s'\n \
+  [--version-file versionFile]              # optional, VERSION file filename (option allowed multiple times) or colon-separated pathnames to VERSION file filenames, if given implies '--tech version', default '%s'\n \
   [--verbose|-v]                            # optional, displays detailed progress\n \
   [--help|-h]                               # optional, displays usage\n" \
     "$0" \
@@ -441,22 +433,14 @@ usage() {
     "$RM_PRE" \
     "$RM_RC" \
     "$RM_HELM_CHART_DIR" \
-    "$RM_HELM_CHART_DIR" \
-    "$RM_CSHARP_FILE" \
     "$RM_CSHARP_DIR/$RM_CSHARP_FILE" \
-    "$RM_GRADLE_FILE" \
     "$RM_GRADLE_DIR/$RM_GRADLE_FILE" \
-    "$RM_GRADLE_KOTLIN_FILE" \
     "$RM_GRADLE_KOTLIN_DIR/$RM_GRADLE_KOTLIN_FILE" \
-    "$RM_DOCKER_FILE" \
-    "$RM_DOCKER_VERSION_LABEL" \
     "$RM_DOCKER_DIR/$RM_DOCKER_FILE" \
-    "$RM_MAVEN_FILE" \
+    "$RM_DOCKER_VERSION_LABEL" \
     "$RM_MAVEN_DIR/$RM_MAVEN_FILE" \
     "$RM_NODEJS_DIR" \
-    "$RM_SCALA_SBT_FILE" \
     "$RM_SCALA_DIR/$RM_SCALA_FILE" \
-    "$RM_VERSION_FILE" \
     "$RM_VERSION_DIR/$RM_VERSION_FILE"
 }
 
@@ -554,34 +538,20 @@ while [ $# -gt 0 ]; do
     ;;
   --helm-chart-dir)
     shift
-    RM_HELM_CHART_DIR="$1"
+    RM_PATHNAMES_helm=":$RM_PATHNAMES_helm:$1"
     shift
-    RM_PATHNAMES_helm="" # negates any prior --helm-chart-pathname args
     RM_TECH="$RM_TECH,helm"
     ;;
   --helm-chart-file) # deprecated because filename "Chart.yaml" is not configurable in node.js
     shift
     RM_HELM_CHART_FILE="$1"
     shift
-    RM_HELM_CHART_DIR="$(realpath "$(dirname "$RM_HELM_CHART_FILE")")"
-    echo "WARN: option --helm-chart-file is deprecated; assuming '--helm-chart-dir $RM_HELM_CHART_DIR' instead" >&2
-    RM_PATHNAMES_helm=":$RM_HELM_CHART_DIR:"
-    RM_TECH="$RM_TECH,helm"
-    ;;
-  --helm-chart-dir-pathname)
-    shift
-    RM_PATHNAMES_helm=":$RM_PATHNAMES_helm:$1"
-    shift
+    RM_HELM_CHART_FILE="$(realpath "$(dirname "$RM_HELM_CHART_FILE")")"
+    echo "WARN: option --helm-chart-file is deprecated because filename 'Chart.yaml' is not configurable; assuming '--helm-chart-dir $RM_HELM_CHART_FILE' instead" >&2
+    RM_PATHNAMES_helm=":$RM_PATHNAMES_helm:$RM_HELM_CHART_FILE:"
     RM_TECH="$RM_TECH,helm"
     ;;
   --csharp-file)
-    shift
-    RM_CSHARP_FILE="$1"
-    shift
-    RM_PATHNAMES_csharp="" # negates any prior --csharp-pathname args
-    RM_TECH="$RM_TECH,csharp"
-    ;;
-  --csharp-pathname)
     shift
     RM_PATHNAMES_csharp=":$RM_PATHNAMES_csharp:$1:"
     shift
@@ -589,38 +559,17 @@ while [ $# -gt 0 ]; do
     ;;
   --gradle-file)
     shift
-    RM_GRADLE_FILE="$1"
-    shift
-    RM_PATHNAMES_gradle="" # negates any prior --gradle-pathname args
-    RM_TECH="$RM_TECH,gradle"
-    ;;
-  --gradle-pathname)
-    shift
     RM_PATHNAMES_gradle="$RM_PATHNAMES_gradle:$1:"
     shift
     RM_TECH="$RM_TECH,gradle"
     ;;
   --gradlekts-file)
     shift
-    RM_GRADLE_KOTLIN_FILE="$1"
-    shift
-    RM_PATHNAMES_gradlekts="" # negates any prior --gradlekts-pathname args
-    RM_TECH="$RM_TECH,gradlekts"
-    ;;
-  --gradlekts-pathname)
-    shift
     RM_PATHNAMES_gradlekts="$RM_PATHNAMES_gradlekts:$1:"
     shift
     RM_TECH="$RM_TECH,gradlekts"
     ;;
   --docker-file)
-    shift
-    RM_DOCKER_FILE="$1"
-    shift
-    RM_PATHNAMES_docker="" # negates any prior --docker-pathname args
-    RM_TECH="$RM_TECH,docker"
-    ;;
-  --docker-pathname)
     shift
     RM_PATHNAMES_docker=":$RM_PATHNAMES_docker:$1:"
     shift
@@ -634,25 +583,11 @@ while [ $# -gt 0 ]; do
     ;;
   --maven-file)
     shift
-    RM_MAVEN_FILE="$1"
-    shift
-    RM_PATHNAMES_maven="" # negates any prior --maven-pathname args
-    RM_TECH="$RM_TECH,maven"
-    ;;
-  --maven-pathname)
-    shift
     RM_PATHNAMES_maven=":$RM_PATHNAMES_maven:$1:"
     shift
     RM_TECH="$RM_TECH,maven"
     ;;
   --scala-file)
-    shift
-    RM_SCALA_SBT_FILE="$1"
-    shift
-    RM_PATHNAMES_scala="" # negates any prior --scala-pathname args
-    RM_TECH="$RM_TECH,scala"
-    ;;
-  --scala-pathname)
     shift
     RM_PATHNAMES_scala=":$RM_PATHNAMES_scala:$1:"
     shift
@@ -662,24 +597,17 @@ while [ $# -gt 0 ]; do
     shift
     RM_NODEJS_FILE="$1"
     shift
-    RM_NODEJS_DIR="$(realpath "$(dirname "$RM_NODEJS_FILE")")"
-    echo "WARN: option --nodejs-file is deprecated; assuming '--nodejs-dir-pathname $RM_NODEJS_DIR' instead" >&2
-    RM_PATHNAMES_nodejs=":$RM_NODEJS_DIR:"
+    RM_NODEJS_FILE="$(realpath "$(dirname "$RM_NODEJS_FILE")")"
+    echo "WARN: option --nodejs-file is deprecated because filename 'package.json' is not configurable; assuming '--nodejs-dir $RM_NODEJS_FILE' instead" >&2
+    RM_PATHNAMES_nodejs=":$RM_PATHNAMES_nodejs:$RM_NODEJS_FILE:"
     ;;
-  --nodejs-dir-pathname)
+  --nodejs-dir)
     shift
     RM_PATHNAMES_nodejs=":$RM_PATHNAMES_nodejs:$1:"
     shift
     RM_TECH="$RM_TECH,nodejs"
     ;;
   --version-file)
-    shift
-    RM_VERSION_FILE="$1"
-    shift
-    RM_PATHNAMES_version=""
-    RM_TECH="$RM_TECH,version"
-    ;;
-  --version-pathname)
     shift
     RM_PATHNAMES_version=":$RM_PATHNAMES_version:$1:"
     shift

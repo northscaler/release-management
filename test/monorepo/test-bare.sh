@@ -18,16 +18,16 @@ PREFIX="${PREFIX:-$THIS_ABSPATH/../..}"
 OPTS="\
   --verbose \
   --dev-qa \
-  --csharp-pathname csharp/project-1/AssemblyInfo.cs \
-  --csharp-pathname csharp/project-2/AssemblyInfo.2.cs \
-  --docker-pathname docker/project-1/Dockerfile:docker/project-2/project-2.Dockerfile \
-  --gradle-pathname gradle/project-1/build.gradle:gradle/project-2/build.2.gradle \
-  --gradlekts-pathname gradlekts/project-1/build.gradle.kts:gradlekts/project-2/build.gradle.2.kts \
-  --helm-chart-dir-pathname helm/project-1/release-test-chart:helm/project-2/release-test-chart2 \
-  --maven-pathname maven/project-1/pom.xml:maven/project-2/pom.2.xml \
-  --nodejs-dir-pathname nodejs/project-1:nodejs/project-2 \
-  --scala-pathname scala/project-1/build.sbt:scala/project-2/build.2.sbt \
-  --version-pathname version/project-1/VERSION:version/project-2/VERSION2 \
+  --csharp-file csharp/project-1/AssemblyInfo.cs \
+  --csharp-file csharp/project-2/AssemblyInfo.2.cs \
+  --docker-file docker/project-1/Dockerfile:docker/project-2/project-2.Dockerfile \
+  --gradle-file gradle/project-1/build.gradle:gradle/project-2/build.2.gradle \
+  --gradlekts-file gradlekts/project-1/build.gradle.kts:gradlekts/project-2/build.gradle.2.kts \
+  --helm-chart-dir helm/project-1/release-test-chart:helm/project-2/release-test-chart2 \
+  --maven-file maven/project-1/pom.xml:maven/project-2/pom.2.xml \
+  --nodejs-dir nodejs/project-1:nodejs/project-2 \
+  --scala-file scala/project-1/build.sbt:scala/project-2/build.2.sbt \
+  --version-file version/project-1/VERSION:version/project-2/VERSION2 \
   "
 
 MAIN=dev
