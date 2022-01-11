@@ -1,10 +1,8 @@
 #!/usr/bin/env bash
-set -ex
-
-TEST_TYPE="$1"
+set -e
 
 THIS_ABSPATH="$(cd "$(dirname "$0")"; pwd)"
 
 rm -rf \
-  "$THIS_ABSPATH/$TEST_TYPE/local" \
-  "$THIS_ABSPATH/$TEST_TYPE/remote"
+  "$THIS_ABSPATH/local" \
+  "$THIS_ABSPATH/remote"

@@ -297,12 +297,10 @@ setVersion_maven() {
 ##### begin nodejs package.json support
 #####
 RM_NODEJS_DIR="${RM_NODEJS_DIR:-$(pwd)}"
-RM_NODEJS_PACKAGE_JSON_FILE="${RM_NODEJS_PACKAGE_JSON_FILE:-package.json}"
 
 getVersion_nodejs() {
-  local RM_NODEJS_PATHNAME="$1"
-  local RM_NODEJS_DIR_PATHNAME="$(realpath "$(dirname "$RM_NODEJS_PATHNAME")")"
-  local RM_NODEJS_FILENAME="$(basename "$RM_NODEJS_PATHNAME")"
+  local RM_NODEJS_DIR_PATHNAME="$1"
+  RM_NODEJS_DIR_PATHNAME="$(realpath "$RM_NODEJS_DIR_PATHNAME")"
 
   local RM_NODEJS_DOCKER="docker run --rm -i -v $RM_NODEJS_DIR_PATHNAME:/cwd -w /cwd node"
   local RM_NODEJS_NODE=node
@@ -310,22 +308,14 @@ getVersion_nodejs() {
     RM_NODEJS_NODE="$RM_NODEJS_DOCKER node"
   fi
 
-  set -x
-  eval "$RM_NODEJS_NODE -e 'console.log(require(\"./$RM_NODEJS_FILENAME\").version)'"
-  set +x
+  eval "$RM_NODEJS_NODE -e 'console.log(require(\"./package.json\").version)'"
 }
 
 setVersion_nodejs() {
   local V=$1
-  local RM_NODEJS_PATHNAME="$2"
-  local RM_NODEJS_DIR_PATHNAME="$(realpath "$(dirname "$RM_NODEJS_PATHNAME")")"
-  local RM_NODEJS_FILENAME="$(basename "$1")"
+  local RM_NODEJS_DIR_PATHNAME="$2"
+  RM_NODEJS_DIR_PATHNAME="$(realpath "$RM_NODEJS_DIR_PATHNAME")"
   local RM_NODEJS_DOCKER="docker run --rm -i -v $RM_NODEJS_DIR_PATHNAME:/cwd -w /cwd node"
-
-  local RM_NODEJS_NODE=node
-  if [ -n "$NO_USE_LOCAL_NODEJS" ] || ! eval "$RM_NODEJS_NODE --version" >/dev/null 2>&1; then
-    RM_NODEJS_NODE="$RM_NODEJS_DOCKER node"
-  fi
 
   RM_NODEJS_NPM=npm
   if [ -n "$NO_USE_LOCAL_NPM" ] || ! eval "$RM_NODEJS_NPM --version" >/dev/null 2>&1; then
@@ -334,8 +324,8 @@ setVersion_nodejs() {
 
   (cd "$RM_NODEJS_DIR_PATHNAME" && eval "$RM_NODEJS_NPM version --no-git-tag-version --allow-same-version $V")
 
-  verbose "$RM_NODEJS_PATHNAME is now:"
-  verbose "$(cat "$RM_NODEJS_PATHNAME")"
+  verbose "$RM_NODEJS_DIR_PATHNAME/package.json is now:"
+  verbose "$(cat "$RM_NODEJS_DIR_PATHNAME/package.json")"
 }
 #####
 ##### end nodejs package.json support
@@ -439,8 +429,7 @@ usage() {
   [--docker-pathname dockerPathnames]       # optional, colon-separated pathname(s) to docker files, implies '--tech docker', default '%s'\n \
   [--maven-file mavenFile]                  # optional, maven POM filename, implies '--tech maven', default '%s'\n \
   [--maven-pathname mavenPathnames]         # optional, colon-separated pathname(s) to maven files, implies '--tech maven', default '%s'\n \
-  [--nodejs-file packageJson]               # optional, nodejs filename, implies '--tech nodejs', default '%s'\n \
-  [--nodejs-pathname nodejsPathnames]       # optional, colon-separated pathname(s) to nodejs files, implies '--tech nodejs', default '%s'\n \
+  [--nodejs-dir-pathname nodejsPathnames]   # optional, colon-separated pathname(s) to nodejs directories, implies '--tech nodejs', default '%s'\n \
   [--scala-file buildSbt]                   # optional, scala filename, implies '--tech scala', default '%s'\n \
   [--scala-pathname scalaPathnames]         # optional, colon-separated pathname(s) to scala files, implies '--tech scala', default '%s'\n \
   [--version-file versionFile]              # optional, version filename, implies '--tech version', default '%s'\n \
@@ -472,8 +461,7 @@ usage() {
     "$RM_DOCKER_DIR/$RM_DOCKER_FILE" \
     "$RM_MAVEN_FILE" \
     "$RM_MAVEN_DIR/$RM_MAVEN_FILE" \
-    "$RM_NODEJS_PACKAGE_JSON" \
-    "$RM_NODEJS_DIR/$RM_NODEJS_PACKAGE_JSON_FILE" \
+    "$RM_NODEJS_DIR" \
     "$RM_SCALA_SBT_FILE" \
     "$RM_SCALA_DIR/$RM_SCALA_FILE" \
     "$RM_VERSION_FILE" \
@@ -676,14 +664,15 @@ while [ $# -gt 0 ]; do
     shift
     RM_TECH="$RM_TECH,scala"
     ;;
-  --nodejs-file)
+  --nodejs-file) # deprecated because filename "package.json" is not configurable in node.js
     shift
-    RM_NODEJS_PACKAGE_JSON="$1"
+    RM_NODEJS_FILE="$1"
     shift
-    RM_PATHNAMES_nodejs="" # negates any prior --nodejs-pathname args
-    RM_TECH="$RM_TECH,nodejs"
+    RM_NODEJS_DIR="$(realpath "$(dirname "$RM_NODEJS_FILE")")"
+    echo "WARN: option --nodejs-file is deprecated; assuming '--nodejs-dir-pathname $RM_NODEJS_DIR' instead" >&2
+    RM_PATHNAMES_nodejs=":$RM_NODEJS_DIR:"
     ;;
-  --nodejs-pathname)
+  --nodejs-dir-pathname)
     shift
     RM_PATHNAMES_nodejs=":$RM_PATHNAMES_nodejs:$1:"
     shift
@@ -701,11 +690,6 @@ while [ $# -gt 0 ]; do
     RM_PATHNAMES_version=":$RM_PATHNAMES_version:$1:"
     shift
     RM_TECH="$RM_TECH,version"
-    ;;
-  --version-file)
-    shift
-    RM_VERSION_FILE="$1"
-    shift
     ;;
   --help | -h)
     usage >&2
@@ -750,7 +734,7 @@ if [ -z "$RM_PATHNAMES_scala" ]; then
   RM_PATHNAMES_scala="$(realpath "$RM_SCALA_SBT_DIR/$RM_SCALA_SBT_FILE")"
 fi
 if [ -z "$RM_PATHNAMES_nodejs" ]; then
-  RM_PATHNAMES_nodejs="$(realpath "$RM_NODEJS_DIR/$RM_NODEJS_PACKAGE_JSON_FILE")"
+  RM_PATHNAMES_nodejs="$(realpath "$RM_NODEJS_DIR")"
 fi
 if [ -z "$RM_PATHNAMES_version" ]; then
   RM_PATHNAMES_version="$(realpath "$RM_VERSION_DIR/$RM_VERSION_FILE")"
@@ -765,6 +749,17 @@ if [ -z "$RM_TECHNOLOGIES" ]; then
   usage >&2
   exit $RM_ERR_INVOCATION
 fi
+
+uniquifyPaths() {
+  echo "$1" | tr ':' '\n' | uniq | tr '\n' ':' | sed -E 's/:{2,}/:/g' | sed -E 's/^://' | sed -E 's/:$//'
+}
+
+for t in $RM_TECHNOLOGIES; do
+  UP="$(eval "echo \$RM_PATHNAMES_$t")"
+  UP="$(uniquifyPaths "$UP")"
+  eval "RM_PATHNAMES_$t='$UP'"
+  verbose "INFO: $t paths=$(eval "echo \$RM_PATHNAMES_$t")"
+done
 
 # ensure only one positional argument given & that it's a supported value
 case "$RM_RELEASE_LEVEL" in

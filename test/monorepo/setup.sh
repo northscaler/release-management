@@ -1,26 +1,22 @@
 #!/usr/bin/env bash
-set -ex
-
-TEST_TYPE="$1"
+set -e
 
 THIS_ABSPATH="$(cd "$(dirname "$0")"; pwd)"
-ORIGIN=${ORIGIN:-origin}
-MAIN=${MAIN:-master}
+ORIGIN=origin
+MAIN=dev
 
-rm -rf "$THIS_ABSPATH/$TEST_TYPE/local"
-cp -r "$THIS_ABSPATH/$TEST_TYPE/local-src" "$THIS_ABSPATH/$TEST_TYPE/local"
-git init -b $MAIN "$THIS_ABSPATH/$TEST_TYPE/local"
+LOCAL_PATH="$THIS_ABSPATH/local"
+rm -rf "$LOCAL_PATH"
+cp -r "$THIS_ABSPATH/local-src" "$LOCAL_PATH"
+git init -b $MAIN "$LOCAL_PATH"
 
-rm -rf "$THIS_ABSPATH/$TEST_TYPE/remote"
-mkdir -p "$THIS_ABSPATH/$TEST_TYPE/remote"
-git init --bare "$THIS_ABSPATH/$TEST_TYPE/remote"
-
-if [ -z "$REMOTE_PATH" ]; then
-  REMOTE_PATH="$(cd "$(dirname "$THIS_ABSPATH/$TEST_TYPE")"; pwd)/$TEST_TYPE/remote"
-fi
+REMOTE_PATH="$THIS_ABSPATH/remote"
+rm -rf "$REMOTE_PATH"
+mkdir -p "$REMOTE_PATH"
+git init --bare "$REMOTE_PATH"
 
 (
-  cd "$THIS_ABSPATH/$TEST_TYPE/local"
+  cd "$LOCAL_PATH"
   git add .
   git commit -m 'begin test'
   git remote add $ORIGIN "$REMOTE_PATH"
