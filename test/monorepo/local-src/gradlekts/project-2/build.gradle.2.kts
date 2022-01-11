@@ -5,7 +5,7 @@ plugins {
 }
 
 group = "com.northscaler"
-version = "2.3.0-pre.0"
+version = "2.3.0-dev.0"
 sourceCompatibility = "11"
 project.ext.ignoreTests = true
 

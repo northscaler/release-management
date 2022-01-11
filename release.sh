@@ -172,9 +172,9 @@ getVersion_gradle() {
 }
 
 setVersion_gradle() {
-  local RM_GRADLE_FILE_PATHNAME="$2"
   local V=$1
-  local FC="$(cat "$RM_GRADLE_FILE")"
+  local RM_GRADLE_FILE_PATHNAME="$2"
+  local FC="$(cat "$RM_GRADLE_FILE_PATHNAME")"
 
   echo "$FC" \
   | sed "s/^version.*/version = \'$V\'/" \
@@ -196,21 +196,21 @@ RM_GRADLE_KOTLIN_FILE="${RM_GRADLE_KOTLIN_FILE:-build.gradle.kts}"
 getVersion_gradlekts() {
   local RM_GRADLE_KOTLIN_FILE_PATHNAME="$1"
 
-  cat "$RM_GRADLE_KOTLIN_FILE_PATHNAME" | grep -E "^version" | grep -Eo "['\"].*['\"]" | tr '"' ' ' | tr "'" ' ' | xargs
+  grep -E "^version" < "$RM_GRADLE_KOTLIN_FILE_PATHNAME" | grep -Eo "['\"].*['\"]" | tr '"' ' ' | tr "'" ' ' | xargs
 }
 
 # usage: setVersion version
 setVersion_gradlekts() {
   local V=$1
-  local FC="$(cat "$RM_GRADLE_KOTLIN_FILE")"
   local RM_GRADLE_KOTLIN_FILE_PATHNAME="$2"
+  local FC="$(cat "$RM_GRADLE_KOTLIN_FILE_PATHNAME")"
 
   echo "$FC" \
   | sed "s/^version.*/version = \"$V\"/" \
   > "$RM_GRADLE_KOTLIN_FILE_PATHNAME"
 
   verbose "$RM_GRADLE_KOTLIN_FILE_PATHNAME is now:"
-  verbose "$(cat cat "$RM_GRADLE_KOTLIN_FILE_PATHNAME")"
+  verbose "$(cat "$RM_GRADLE_KOTLIN_FILE_PATHNAME")"
 }
 #####
 ##### end gradlekts support
@@ -231,9 +231,9 @@ getVersion_docker() {
 
 setVersion_docker() {
   local V=$1
+  local RM_DOCKER_FILE_PATHNAME="$2"
   local label
   local first=true
-  local RM_DOCKER_FILE_PATHNAME="$2"
   local lines
 
   printf "$(cat "$RM_DOCKER_FILE_PATHNAME")\n" | while read line; do
@@ -255,7 +255,7 @@ setVersion_docker() {
   printf "$lines" > "$RM_DOCKER_FILE_PATHNAME"
 
   verbose "$RM_DOCKER_FILE_PATHNAME is now:"
-  verbose "$(cat cat "$RM_DOCKER_FILE_PATHNAME")"
+  verbose "$(cat "$RM_DOCKER_FILE_PATHNAME")"
 }
 #####
 ##### end Docker image support
@@ -331,19 +331,19 @@ setVersion_nodejs() {
 RM_SCALA_SBT_DIR="${RM_SCALA_SBT_DIR:-$(pwd)}"
 RM_SCALA_SBT_FILE="${RM_SCALA_SBT_FILE:-build.sbt}"
 
-getVersion_sbt() {
+getVersion_scala() {
   local RM_SCALA_SBT_FILE_PATHNAME="$1"
 
-  cat "$RM_SCALA_SBT_FILE_PATHNAME" | grep -E "^version\s*\:\=.*" | eval "$MATCH \".*\"" | sed 's/"//g'
+  grep -E '^\s*version\s*:=\s*".*"\s*$' < "$RM_SCALA_SBT_FILE_PATHNAME" | eval "$MATCH '(\d+\.\d+\.\d+(-.+\.\d+)?)'" | awk '{ print $1 }'
 }
 
-setVersion_sbt() {
+setVersion_scala() {
   local V=$1
   local RM_SCALA_SBT_FILE_PATHNAME="$2"
   local FC="$(cat "$RM_SCALA_SBT_FILE_PATHNAME")"
 
   echo "$FC" \
-  | sed "s/^version.*/version := \"$V\"/" \
+  | sed -E "s/^\s*version *:= *\".+\" *$/version := \"$V\"/" \
   > "$RM_SCALA_SBT_FILE_PATHNAME"
 
   verbose "$RM_SCALA_SBT_FILE_PATHNAME is now:"
@@ -700,42 +700,6 @@ while [ $# -gt 0 ]; do
   esac
 done
 
-# purge args
-while [ $# -gt 0 ]; do
-  debug "purging: $*"
-  shift
-done
-
-if [ -z "$RM_PATHNAMES_helm" ]; then
-  RM_PATHNAMES_helm="$(realpath "$RM_HELM_CHART_DIR/$RM_HELM_CHART_FILE")"
-fi
-if [ -z "$RM_PATHNAMES_csharp" ]; then
-  RM_PATHNAMES_csharp="$(realpath "$RM_CSHARP_DIR/$RM_CSHARP_FILE")"
-fi
-if [ -z "$RM_PATHNAMES_gradle" ]; then
-  RM_PATHNAMES_gradle="$(realpath "$RM_GRADLE_DIR/$RM_GRADLE_FILE")"
-fi
-if [ -z "$RM_PATHNAMES_gradlekts" ]; then
-  RM_PATHNAMES_gradlekts="$(realpath "$RM_GRADLE_KOTLIN_DIR/$RM_GRADLE_KOTLIN_FILE")"
-fi
-if [ -z "$RM_PATHNAMES_docker" ]; then
-  RM_PATHNAMES_docker="$(realpath "$RM_DOCKER_DIR/$RM_DOCKER_FILE")"
-fi
-if [ -z "$RM_PATHNAMES_maven" ]; then
-  RM_PATHNAMES_maven="$(realpath "$RM_MAVEN_DIR/$RM_MAVEN_FILE")"
-fi
-if [ -z "$RM_PATHNAMES_scala" ]; then
-  RM_PATHNAMES_scala="$(realpath "$RM_SCALA_SBT_DIR/$RM_SCALA_SBT_FILE")"
-fi
-if [ -z "$RM_PATHNAMES_nodejs" ]; then
-  RM_PATHNAMES_nodejs="$(realpath "$RM_NODEJS_DIR")"
-fi
-if [ -z "$RM_PATHNAMES_version" ]; then
-  RM_PATHNAMES_version="$(realpath "$RM_VERSION_DIR/$RM_VERSION_FILE")"
-fi
-
-# validations
-
 # ensure at least one tech given
 RM_TECHNOLOGIES="$(echo -n "$RM_TECH" | tr ',' '\n' | uniq | xargs)"
 if [ -z "$RM_TECHNOLOGIES" ]; then
@@ -743,6 +707,37 @@ if [ -z "$RM_TECHNOLOGIES" ]; then
   usage >&2
   exit $RM_ERR_INVOCATION
 fi
+
+# default things if necessary
+if [ -z "$RM_PATHNAMES_helm" ] && echo "$RM_TECHNOLOGIES" | grep -Eq '(^|\s+)helm(\s+|$)'; then
+  RM_PATHNAMES_helm="$(realpath "$RM_HELM_CHART_DIR/$RM_HELM_CHART_FILE")"
+fi
+if [ -z "$RM_PATHNAMES_csharp" ] && echo "$RM_TECHNOLOGIES" | grep -Eq '(^|\s+)csharp(\s+|$)'; then
+  RM_PATHNAMES_csharp="$(realpath "$RM_CSHARP_DIR/$RM_CSHARP_FILE")"
+fi
+if [ -z "$RM_PATHNAMES_gradle" ] && echo "$RM_TECHNOLOGIES" | grep -Eq '(^|\s+)gradle(\s+|$)'; then
+  RM_PATHNAMES_gradle="$(realpath "$RM_GRADLE_DIR/$RM_GRADLE_FILE")"
+fi
+if [ -z "$RM_PATHNAMES_gradlekts" ] && echo "$RM_TECHNOLOGIES" | grep -Eq '(^|\s+)gradlekts(\s+|$)'; then
+  RM_PATHNAMES_gradlekts="$(realpath "$RM_GRADLE_KOTLIN_DIR/$RM_GRADLE_KOTLIN_FILE")"
+fi
+if [ -z "$RM_PATHNAMES_docker" ] && echo "$RM_TECHNOLOGIES" | grep -Eq '(^|\s+)docker(\s+|$)'; then
+  RM_PATHNAMES_docker="$(realpath "$RM_DOCKER_DIR/$RM_DOCKER_FILE")"
+fi
+if [ -z "$RM_PATHNAMES_maven" ] && echo "$RM_TECHNOLOGIES" | grep -Eq '(^|\s+)maven(\s+|$)'; then
+  RM_PATHNAMES_maven="$(realpath "$RM_MAVEN_DIR/$RM_MAVEN_FILE")"
+fi
+if [ -z "$RM_PATHNAMES_scala" ] && echo "$RM_TECHNOLOGIES" | grep -Eq '(^|\s+)scala(\s+|$)'; then
+  RM_PATHNAMES_scala="$(realpath "$RM_SCALA_SBT_DIR/$RM_SCALA_SBT_FILE")"
+fi
+if [ -z "$RM_PATHNAMES_nodejs" ] && echo "$RM_TECHNOLOGIES" | grep -Eq '(^|\s+)nodejs(\s+|$)'; then
+  RM_PATHNAMES_nodejs="$(realpath "$RM_NODEJS_DIR")"
+fi
+if [ -z "$RM_PATHNAMES_version" ] && echo "$RM_TECHNOLOGIES" | grep -Eq '(^|\s+)version(\s+|$)'; then
+  RM_PATHNAMES_version="$(realpath "$RM_VERSION_DIR/$RM_VERSION_FILE")"
+fi
+
+# validations
 
 uniquifyPaths() {
   echo "$1" | tr ':' '\n' | uniq | tr '\n' ':' | sed -E 's/:{2,}/:/g' | sed -E 's/^://' | sed -E 's/:$//'
@@ -784,12 +779,13 @@ fi
 
 setVersions() {
   for t in $RM_TECHNOLOGIES; do
+    local pathnames="$(eval "echo \$RM_PATHNAMES_$t")"
     ORIG_IFS="$IFS"
-    IFS=':'
-    for p in $(eval "echo \$RM_PATHNAMES_$t"); do
+    export IFS=':'
+    for p in $pathnames; do
       setVersion_$t $1 "$p"
     done
-    IFS="$ORIG_IFS"
+    export IFS="$ORIG_IFS"
   done
 }
 
@@ -799,9 +795,9 @@ git pull $RM_ORIGIN
 
 verbose "checking that all versions are exactly the same"
 for t in $RM_TECHNOLOGIES; do
-  ORIG_IFS="$IFS"
-  IFS=':'
   pathnames="$(eval "echo \$RM_PATHNAMES_$t")"
+  ORIG_IFS="$IFS"
+  export IFS=':'
   for p in $pathnames; do
     fqpn="$(realpath "$p")"
     debug "invoking: getVersion_$t $fqpn"
@@ -818,7 +814,7 @@ for t in $RM_TECHNOLOGIES; do
     t_last="$t"
     p_last="$p"
   done
-  IFS="$ORIG_IFS"
+  export IFS="$ORIG_IFS"
 done
 RM_VERSION="$v_last"
 

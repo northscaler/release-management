@@ -1,7 +1,10 @@
 #!/usr/bin/env bash
 set -e
 
-THIS_ABSPATH="$(cd "$(dirname "$0")"; pwd)"
+THIS_ABSPATH="$(
+  cd "$(dirname "$0")"
+  pwd
+)"
 
 export NO_USE_LOCAL_NODEJS=1
 export NO_USE_LOCAL_NPM=1
@@ -20,15 +23,17 @@ OPTS="\
   --docker-pathname docker/project-1/Dockerfile:docker/project-2/project-2.Dockerfile \
   --gradle-pathname gradle/project-1/build.gradle:gradle/project-2/build.2.gradle \
   --gradlekts-pathname gradlekts/project-1/build.gradle.kts:gradlekts/project-2/build.gradle.2.kts \
-  --helm-dir-pathname helm/project-1/release-test-chart:helm/project-2/release-test-chart2 \
+  --helm-chart-dir-pathname helm/project-1/release-test-chart:helm/project-2/release-test-chart2 \
   --maven-pathname maven/project-1/pom.xml:maven/project-2/pom.2.xml \
   --nodejs-dir-pathname nodejs/project-1:nodejs/project-2 \
   --scala-pathname scala/project-1/build.sbt:scala/project-2/build.2.sbt \
   --version-pathname version/project-1/VERSION:version/project-2/VERSION2 \
   "
 
+MAIN=dev
 PRE=dev
 RC=qa
+# export RM_DEBUG=1
 
 # TODO: test assertions & saddy paths
 
@@ -39,40 +44,58 @@ gitLastMsg='git log --pretty="%s"  HEAD^..HEAD'
   cd "$THIS_ABSPATH/local"
 
   echo "TEST: 1 $PRE"
-  $PREFIX/$SCRIPT $OPTS $PRE
+  cmd="$PREFIX/$SCRIPT $OPTS $PRE"
+  echo $cmd
+  $cmd
   $gitLog
 
   echo "TEST: 2 $RC"
-  $PREFIX/$SCRIPT $OPTS $RC
+  cmd="$PREFIX/$SCRIPT $OPTS $RC"
+  echo $cmd
+  $cmd
   $gitLog
 
   echo "TEST: 3 $RC"
-  $PREFIX/$SCRIPT $OPTS $RC
+  cmd="$PREFIX/$SCRIPT $OPTS $RC"
+  echo $cmd
+  $cmd
   $gitLog
 
   echo 'TEST: 4 minor'
-  $PREFIX/$SCRIPT $OPTS minor
+  cmd="$PREFIX/$SCRIPT $OPTS minor"
+  echo $cmd
+  $cmd
   $gitLog
 
   echo "TEST: 5 $RC"
-  $PREFIX/$SCRIPT $OPTS $RC
+  cmd="$PREFIX/$SCRIPT $OPTS $RC"
+  echo $cmd
+  $cmd
   $gitLog
 
   echo 'TEST: 6 patch'
-  $PREFIX/$SCRIPT $OPTS patch
+  cmd="$PREFIX/$SCRIPT $OPTS patch"
+  echo $cmd
+  $cmd
   $gitLog
 
   echo "TEST: 7 $RC"
-  $PREFIX/$SCRIPT $OPTS $RC
+  cmd="$PREFIX/$SCRIPT $OPTS $RC"
+  echo $cmd
+  $cmd
   $gitLog
 
-  git checkout master
+  git checkout $MAIN
 
   echo "TEST: 8 $PRE"
-  $PREFIX/$SCRIPT $OPTS $PRE
+  cmd="$PREFIX/$SCRIPT $OPTS $PRE"
+  echo $cmd
+  $cmd
   $gitLog
 
   echo "TEST: 9 $RC"
-  $PREFIX/$SCRIPT $OPTS $RC
+  cmd="$PREFIX/$SCRIPT $OPTS $RC"
+  echo $cmd
+  $cmd
   $gitLog
 )

@@ -1,6 +1,6 @@
 name := "test-sbt"
 
-version := "2.3.0-pre.0"
+version := "2.3.0-dev.0"
 
 scalaVersion := "2.12.4"
 
