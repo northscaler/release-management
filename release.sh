@@ -702,6 +702,11 @@ while [ $# -gt 0 ]; do
     shift
     RM_TECH="$RM_TECH,version"
     ;;
+  --version-file)
+    shift
+    RM_VERSION_FILE="$1"
+    shift
+    ;;
   --help | -h)
     usage >&2
     exit 0
