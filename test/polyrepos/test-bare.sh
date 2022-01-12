@@ -49,7 +49,7 @@ getVersionFile() {
   scala)
     echo "$prefix/build.sbt"
     ;;
-  veresion)
+  version)
     echo "$prefix/VERSION"
     ;;
   esac
