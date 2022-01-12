@@ -70,7 +70,7 @@ getVersionFile() {
     assertVersion $t "$(getVersionFile $t)" 1.2.0-pre.4
   done
   assertBranch master
-  assertGitLog 1 message 'bump to 1.2.0-pre.4 \[skip ci\]'
+  assertGitLog 1 message 'bump to 1.2.0-pre.4'
   assertGitLog 2 message 'release 1.2.0-pre.3'
   assertGitLog 2 tag '1.2.0-pre.3$'
 
