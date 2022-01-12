@@ -350,7 +350,6 @@ usage() {
   [--pre-release-token|-k token]      # optional, pre release token, default '%s'\n \
   [--rc-release-token|-K token]       # optional, release candidate release token, default '%s'\n \
   [--dev-qa]                          # optional, shortcut for '--main dev --pre-release-token dev --rc-release-token qa'\n \
-  [--trunk-qa]                        # optional, shortcut for '--main trunk --pre-release-token trunk --rc-release-token qa'\n \
   [--alpha-beta]                      # optional, shortcut for '--main alpha --pre-release-token alpha --rc-release-token beta'\n \
   [--pre-rc]                          # optional, shortcut for '--main master --pre-release-token pre --rc-release-token rc' (legacy behavior)\n \
   [--helm-chart-dir chartDir]         # optional, chart directory, default cwd ('%s')\n \
@@ -441,12 +440,6 @@ while [ $# -gt 0 ]; do
   --dev-qa)
     shift
     RM_MAIN=dev
-    RM_PRE=$RM_MAIN
-    RM_RC=qa
-    ;;
-  --trunk-qa)
-    shift
-    RM_MAIN=trunk
     RM_PRE=$RM_MAIN
     RM_RC=qa
     ;;
