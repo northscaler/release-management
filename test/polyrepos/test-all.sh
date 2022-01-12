@@ -2,7 +2,7 @@
 set -e
 
 THIS_ABSPATH="$(cd "$(dirname "$0")"; pwd)"
-TYPES=${*:-nodejs helm version docker csharp maven gradle gradlekts}
+TYPES=${*:-nodejs helm version docker csharp maven gradle gradlekts nodejs,docker}
 
 for it in $TYPES; do
   export TEST_DOCKER=

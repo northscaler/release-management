@@ -118,7 +118,7 @@ setVersion_helm() {
     | eval "$YMLX 'it => { it.version = \"$V\"; return it; }'" \
     > "$RM_HELM_CHART_FILE_PATHNAME"
 
-  verbose "$RM_HELM_CHART_FILE_PATHNAME is now:"
+  verbose "INFO: $RM_HELM_CHART_FILE_PATHNAME is now:"
   verbose "$(cat "$RM_HELM_CHART_FILE_PATHNAME")"
 }
 #####
@@ -152,7 +152,7 @@ setVersion_csharp() {
   | sed "s/$RM_CSHARP_ENTRY.*/$RM_CSHARP_ENTRY\(\"$1\"\)]/" \
   > "$RM_CSHARP_FILE_PATHNAME"
 
-  verbose "$RM_CSHARP_FILE_PATHNAME is now:"
+  verbose "INFO: $RM_CSHARP_FILE_PATHNAME is now:"
   verbose "$(cat "$RM_CSHARP_FILE_PATHNAME")"
 }
 #####
@@ -180,7 +180,7 @@ setVersion_gradle() {
   | sed "s/^version.*/version = \'$V\'/" \
   > "$RM_GRADLE_FILE_PATHNAME"
 
-  verbose "$RM_GRADLE_FILE_PATHNAME is now:"
+  verbose "INFO: $RM_GRADLE_FILE_PATHNAME is now:"
   verbose "$(cat "$RM_GRADLE_FILE_PATHNAME")"
 }
 #####
@@ -209,7 +209,7 @@ setVersion_gradlekts() {
   | sed "s/^version.*/version = \"$V\"/" \
   > "$RM_GRADLE_KOTLIN_FILE_PATHNAME"
 
-  verbose "$RM_GRADLE_KOTLIN_FILE_PATHNAME is now:"
+  verbose "INFO: $RM_GRADLE_KOTLIN_FILE_PATHNAME is now:"
   verbose "$(cat "$RM_GRADLE_KOTLIN_FILE_PATHNAME")"
 }
 #####
@@ -254,7 +254,7 @@ setVersion_docker() {
   lines="$(cat "$RM_DOCKER_FILE_PATHNAME")\n"
   printf "$lines" > "$RM_DOCKER_FILE_PATHNAME"
 
-  verbose "$RM_DOCKER_FILE_PATHNAME is now:"
+  verbose "INFO: $RM_DOCKER_FILE_PATHNAME is now:"
   verbose "$(cat "$RM_DOCKER_FILE_PATHNAME")"
 }
 #####
@@ -280,7 +280,7 @@ setVersion_maven() {
   eval "$XMLSTARLET ed -P -N x=http://maven.apache.org/POM/4.0.0 -u /x:project/x:version -v $V" > "$RM_MAVEN_FILE_PATHNAME.tmp" < "$RM_MAVEN_FILE_PATHNAME"
   mv "$RM_MAVEN_FILE_PATHNAME.tmp" "$RM_MAVEN_FILE_PATHNAME"
 
-  verbose "$RM_MAVEN_FILE_PATHNAME is now:"
+  verbose "INFO: $RM_MAVEN_FILE_PATHNAME is now:"
   verbose "$(cat "$RM_MAVEN_FILE_PATHNAME")"
 }
 #####
@@ -318,7 +318,7 @@ setVersion_nodejs() {
 
   (cd "$RM_NODEJS_DIR_PATHNAME" && eval "$RM_NODEJS_NPM version --no-git-tag-version --allow-same-version $V")
 
-  verbose "$RM_NODEJS_DIR_PATHNAME/package.json is now:"
+  verbose "INFO: $RM_NODEJS_DIR_PATHNAME/package.json is now:"
   verbose "$(cat "$RM_NODEJS_DIR_PATHNAME/package.json")"
 }
 #####
@@ -346,7 +346,7 @@ setVersion_scala() {
   | sed -E "s/^\s*version *:= *\".+\" *$/version := \"$V\"/" \
   > "$RM_SCALA_SBT_FILE_PATHNAME"
 
-  verbose "$RM_SCALA_SBT_FILE_PATHNAME is now:"
+  verbose "INFO: $RM_SCALA_SBT_FILE_PATHNAME is now:"
   verbose "$(cat "$RM_SCALA_SBT_FILE_PATHNAME")"
 }
 #####
@@ -371,7 +371,7 @@ setVersion_version() {
 
   echo "$V" > "$RM_VERSION_FILE_PATHNAME"
 
-  verbose "$RM_VERSION_FILE_PATHNAME is now:"
+  verbose "INFO: $RM_VERSION_FILE_PATHNAME is now:"
   verbose "$(cat "$RM_VERSION_FILE_PATHNAME")"
 }
 #####
@@ -721,7 +721,7 @@ verbose "INFO: invocation ok; checking required preconditions"
 
 git pull $RM_ORIGIN
 
-verbose "checking that all versions are exactly the same"
+verbose "INFO: checking that all versions are exactly the same"
 for t in $RM_TECHNOLOGIES; do
   pathnames="$(eval "echo \$RM_PATHNAMES_$t")"
   ORIG_IFS="$IFS"
@@ -730,7 +730,7 @@ for t in $RM_TECHNOLOGIES; do
     fqpn="$(realpath "$p")"
     debug "invoking: getVersion_$t $fqpn"
     v="$(getVersion_$t "$fqpn")"
-    verbose "file '$fqpn' has version '$v'"
+    verbose "INFO: file '$fqpn' has version '$v'"
     if [ -n "$v_last" ] && [ "$v_last" != "$v" ]; then
       echo "ERROR: versions among different version files differ:" >&2
       echo "$t is at $v in $p" >&2
@@ -835,7 +835,7 @@ applyChanges() {
   git push $RM_GIT_PUSH_OPTS $SET_UPSTREAM_ARGS
   git push --tags
 
-  verbose "$MSG"
+  verbose "INFO: $MSG"
 }
 
 if [ "$RM_BRANCH" == "$RM_MAIN" ]; then # this will be either an rc release resulting in a new release branch, or a pre
