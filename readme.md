@@ -18,9 +18,9 @@ the [migration guide](migrating-from-pre-2.x.md).
 This is a minor-release-per-branch strategy, and all that the script does is
 
 * manipulate version strings,
-* create release commits & tags, *
+* create release commits & tags,
 * create release branches, and
-* push ot the git remote
+* push to the git remote
 
 so that your CI/CD process can actually perform releases based on branch & tag names as commits are pushed to your git
 remotes. It does this in a low-tech manner, by using text processing tools (`sed`, `awk` & the usual suspects) to
@@ -40,14 +40,14 @@ These are the current prerequisites:
 We currently support release management for various technologies:
 
 * Helm charts
-* Docker images using `Dockerfile`'s `LABEL` directive with a `version=` label
-* Node.js projects using `npm` along with `package.json` (`yarn` is a TODO)
-* Projects that use a plain-text `VERSION` file (by any name)
-* .NET projects in C# that use an `AssemblyInfo.cs` file
+* Docker images using `Dockerfile`'s `LABEL` directive with a `version` attribute (for example, `LABEL version=1.2.3`)
+* Node.js projects using `npm` along with `package.json`
+* C# projects that use an `AssemblyInfo.cs` file
 * Maven projects that use a `pom.xml` file
 * Gradle projects that use a `build.gradle` file
 * Kotlin Gradle projects that use a `build.gradle.kts` file
 * Scala projects that use a `build.sbt` file
+* Projects that use a plain-text `VERSION` file (by any name)
 
 If you need to support other project types, see below for developer information.
 
@@ -55,12 +55,13 @@ If you need to support other project types, see below for developer information.
 * Version numbers are based on [Semantic Versioning](https://semver.org).
 * The main branch, `main` by default, is assumed to always contain the latest & greatest _completed_ features and should
   be releasable at any time. Features _still in progress_ should be developed in feature branches. The name of this
-  branch is configurable via the `--main` option, and _must_ sort alphabetically before your release candidate suffix.
-* The default prerelease suffix in the main branch is the same as the main branch name (ie, `1.0.0-main.0`), and is
-  configurable by setting the `--pre-release-token` option.
-* The default prerelease suffix in release branches is `rc` for "release candidate" (ie, `1.0.0-rc.0`), and is
-  configurable via the `--rc-release-token` option. This value _must_ sort alphabetically after the value of
-  the `--pre-release-token` option.
+  branch is configurable via the `--main` option.
+* The default [prerelease suffix](https://semver.org/#spec-item-9) in the main branch is the same as the main branch
+  name (ie, `1.0.0-main.0`), and is configurable by setting the `--pre-release-token` option.
+* The default [prerelease suffix](https://semver.org/#spec-item-9) in release branches is `rc` for "release candidate" (
+  ie, `1.0.0-rc.0`), and is configurable via the `--rc-release-token` option. This value _must_ sort alphabetically
+  after the value of the `--pre-release-token` option.
+* This tool does _not_ make use of [semver build metadata](https://semver.org/#spec-item-10).
 * The name of the git remote is assumed to be `origin`, but is configurable via the `--origin` option.
 
 ## Note about deployables
@@ -75,9 +76,6 @@ There are some convenient preset options supported by the `release.sh` script:
 
 * `--dev-qa`:  uses
     * `dev` for both the main branch name & pre prerelease token, and
-    * `qa` for the RC prerelease token
-* `--trunk-qa`:  uses
-    * `trunk` for both the main branch name & pre prerelease token, and
     * `qa` for the RC prerelease token
 * `--alpha-beta`:  uses
     * `alpha` for both the main branch name & pre prerelease token, and
@@ -129,12 +127,12 @@ The following is a detailed description of the workflow.
     * _New features should be developed in feature branches off of the main branch and only merged back to the main
       branch when they're considered complete._
 * When you're ready to do your first development preview release, prerelease from your main branch with the
-  command `./release.sh --tech nodejs,docker,helm --dev--qa dev`.
+  command `./release.sh --tech nodejs,docker,helm --dev-qa dev`.
     * This will create tags & commits for your `dev` prerelease & push them, whereupon your CI/CD pipeline should kick
       in and actually perform your release workflow. This is dependent on your CI/CD provider and is left to you.
 * When you've decided that you're _feature complete_, but not necessarily _bug-free_, you can create your next minor
   release branch with an initial release candidate from the main branch
-  with `./release.sh --tech nodejs,docker,helm --dev--qa qa`.
+  with `./release.sh --tech nodejs,docker,helm --dev-qa qa`.
     * This will create a release branch in the format `vx.y` where `x` is your main branch's current major version
       and `y` is its minor version. The initial version in the `vx.y` branch will be `x.y.0-qa.0`, which will be
       released, then it will be immediately bumped to `x.y.0-qa.1` in preparation for your next release candidate.
@@ -146,12 +144,12 @@ The following is a detailed description of the workflow.
 * When you've decided that you're _sufficiently bug-free_ in your minor release branch to release to staging and/or
   production (often called a "GA", or "generally available" release), as agreed upon by your stakeholders (the
   development team, QA team, customers, customer advocates, etc), you can perform a minor release in that branch
-  with `./release.sh --tech nodejs,docker,helm --dev--qa minor`.
+  with `./release.sh --tech nodejs,docker,helm --dev-qa minor`.
     * This will result in a release commit with tag `vx.y.0`, and the script will bump your prerelease number in the
       release branch to `x.y.1-qa.0`, where `x` & `y` are your major & minor version numbers, respectively.
     * You can then indefinitely fix bugs & release patched release candidates
-      via `./release.sh --tech nodejs,docker,helm --dev--qa qa` or release patched GA (general availability) releases
-      via `./release.sh --tech nodejs,docker,helm --dev--qa patch`.
+      via `./release.sh --tech nodejs,docker,helm --dev-qa qa` or release patched GA (general availability) releases
+      via `./release.sh --tech nodejs,docker,helm --dev-qa patch`.
 * In parallel after you've cut a minor release branch, you can continue doing work in `master` for your next minor
   release, `vx.z` where `z` is `y + 1`.
 

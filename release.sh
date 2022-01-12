@@ -406,7 +406,6 @@ usage() {
   [--pre-release-token|-k token]            # optional, pre release token, default '%s' (if given multiple times, last one wins)\n \
   [--rc-release-token|-K token]             # optional, release candidate release token, default '%s' (if given multiple times, last one wins)\n \
   [--dev-qa]                                # optional, shortcut for '--main dev --pre-release-token dev --rc-release-token qa' (if other shortcut options given multiple times, last one wins)\n \
-  [--trunk-qa]                              # optional, shortcut for '--main trunk --pre-release-token trunk --rc-release-token qa' (if other shortcut options given multiple times, last one wins)\n \
   [--alpha-beta]                            # optional, shortcut for '--main alpha --pre-release-token alpha --rc-release-token beta' (if other shortcut options given multiple times, last one wins)\n \
   [--pre-rc]                                # optional, shortcut for legacy behavior of '--main master --pre-release-token pre --rc-release-token rc' (if other shortcut options given multiple times, last one wins)\n \
   [--helm-chart-dir chartDir]               # optional, chart directory (option allowed multiple times) or colon-separated pathnames to chart directories, if given implies '--tech helm', default cwd ('%s')\n \
@@ -503,12 +502,6 @@ while [ $# -gt 0 ]; do
   --dev-qa)
     shift
     RM_MAIN=dev
-    RM_PRE=$RM_MAIN
-    RM_RC=qa
-    ;;
-  --trunk-qa)
-    shift
-    RM_MAIN=trunk
     RM_PRE=$RM_MAIN
     RM_RC=qa
     ;;
