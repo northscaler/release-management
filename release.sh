@@ -135,7 +135,7 @@ RM_CSHARP_ENTRY="${RM_CSHARP_ENTRY:-AssemblyInformationalVersion}"
 getVersion_csharp() {
   local RM_CSHARP_FILE_PATHNAME="$1"
 
-  cat "$RM_CSHARP_FILE_PATHNAME" | grep -E "$RM_CSHARP_ENTRY" | eval "$MATCH '(\d+\.\d+\.\d+(-.+\.\d+)?)'" | awk '{ print $1 }'
+  grep -E "$RM_CSHARP_ENTRY" < "$RM_CSHARP_FILE_PATHNAME" | eval "$MATCH '(\d+\.\d+\.\d+(-.+\.\d+)?)'" | awk '{ print $1 }'
 }
 
 setVersion_csharp() {
@@ -168,7 +168,7 @@ RM_GRADLE_FILE="${RM_GRADLE_FILE:-build.gradle}"
 getVersion_gradle() {
   local RM_GRADLE_FILE_PATHNAME="$1"
 
-  cat "$RM_GRADLE_FILE_PATHNAME" | grep -E "^version" | eval "$MATCH \'.*\'" | sed "s/'//g"
+  grep -E "^version" < "$RM_GRADLE_FILE_PATHNAME" | eval "$MATCH \'.*\'" | sed "s/'//g"
 }
 
 setVersion_gradle() {
@@ -835,7 +835,7 @@ applyChanges() {
   git push $RM_GIT_PUSH_OPTS $SET_UPSTREAM_ARGS
   git push --tags
 
-  verbose "INFO: $MSG"
+  verbose "$MSG"
 }
 
 if [ "$RM_BRANCH" == "$RM_MAIN" ]; then # this will be either an rc release resulting in a new release branch, or a pre
@@ -892,7 +892,7 @@ if [ "$RM_BRANCH" == "$RM_MAIN" ]; then # this will be either an rc release resu
 
       applyChanges "bump to $RM_NEXT_RELEASE_BRANCH_VERSION [skip ci]"
 
-      verbose "INFO: released '$RM_RC' version '$RM_VERSION' in branch '$RM_NEW_RELEASE_BRANCH' ok."
+      verbose "INFO: released '$RM_RC' version '$RM_NEXT_RELEASE_BRANCH_VERSION' in branch '$RM_NEW_RELEASE_BRANCH' ok."
       exit 0
       ;;
 

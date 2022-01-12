@@ -1,8 +1,10 @@
 #!/usr/bin/env bash
 set -e
 
+export MATCH="docker run --rm -i matthewadams12/match"
 export YMLX="docker run --rm -i matthewadams12/ymlx"
 export XMLSTARLET="docker run --rm -i jakubsacha/docker-xmlstarlet"
+RM_CSHARP_ENTRY=AssemblyInformationalVersion
 
 getVersion_helm() {
   local RM_HELM_CHART_DIR_PATHNAME="$1"
@@ -12,12 +14,12 @@ getVersion_helm() {
 getVersion_csharp() {
   local RM_CSHARP_FILE_PATHNAME="$1"
 
-  cat "$RM_CSHARP_FILE_PATHNAME" | grep -E "$RM_CSHARP_ENTRY" | eval "$MATCH '(\d+\.\d+\.\d+(-.+\.\d+)?)'" | awk '{ print $1 }'
+  grep -E "$RM_CSHARP_ENTRY" < "$RM_CSHARP_FILE_PATHNAME" | eval "$MATCH '(\d+\.\d+\.\d+(-.+\.\d+)?)'" | awk '{ print $1 }'
 }
 getVersion_gradle() {
   local RM_GRADLE_FILE_PATHNAME="$1"
 
-  cat "$RM_GRADLE_FILE_PATHNAME" | grep -E "^version" | eval "$MATCH \'.*\'" | sed "s/'//g"
+  grep -E "^version" < "$RM_GRADLE_FILE_PATHNAME" | eval "$MATCH \'.*\'" | sed "s/'//g"
 }
 getVersion_gradlekts() {
   local RM_GRADLE_KOTLIN_FILE_PATHNAME="$1"
