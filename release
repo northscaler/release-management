@@ -6,7 +6,7 @@ set -e
 THIS_ABSPATH="$(cd "$(dirname "$0")"; pwd)"
 
 # Update this value to have this repo use a different version of the release.sh script to release itself
-RM_USE_VERSION=2.0.0
+RM_USE_VERSION=2.1.0
 # Override the version in use if you want to by setting RM_VERSION before invoking this script
 RM_VERSION=${RM_VERSION:-$RM_USE_VERSION} # the git ref of the version of the release-management file you want to get
 
