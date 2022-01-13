@@ -1,4 +1,4 @@
-# `master` Branch Deprecation Notice
+# `master` Branch Deprecation Notice: Use [dev](https://gitlab.com/northscaler-public/release-management/-/tree/dev)!
 
 > NOTE: the content in this branch is now frozen and will undergo no further development.
 > All new development will happen in the `dev` branch, however, the `master` branch will continue to be the default branch for backward compatibility.
