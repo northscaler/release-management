@@ -156,6 +156,29 @@ The following is a detailed description of the workflow.
 See also the [release workflow diagram](release-workflow.jpg) ([pdf](release-workflow.pdf)) or
 its [Apple Keynote](https://www.apple.com/keynote/) [source](release-workflow.key).
 
+### Monorepo support
+
+Prior to version 2.1.0, this tool did not support monorepos. From 2.1.0 onward, it does.
+
+In a monorepo, all version strings in all files containing versions must be _exactly_ the same.
+
+> Supporting differing versions in the same monorepo would break the minor-release-per-branch workflow.
+
+To use this tool with a monorepo, simply list all project files that need to be updated, except for
+Node.js `package.json` files or Helm Chart `Chart.yaml` files, because neither `package.json` nor `Chart.yaml` are
+configurable. For Node.js & Helm Chart projects, give the directory in which the project files can be found.
+
+For example, in a monorepo with, say, a Java backend built with Maven in directory `backend` & an SPA frontend built
+with Node.js in directory `frontend` of off the root of the git repo, use something like
+
+```shell
+$ ./release --dev-qa --maven-file backend/pom.xml --nodejs-dir frontend
+```
+
+You can specify project file/dir options multiple times, or provide colon-separated lists of project files/dirs.
+
+Make sure you review the output of `./release.sh --help`.
+
 ### Prerequisites to running on Windows
 
 * Project requires Hyper-v, Docker and WSL (Windows Subsystem for Linux).
@@ -184,14 +207,22 @@ its [Apple Keynote](https://www.apple.com/keynote/) [source](release-workflow.ke
 
 ## For contributors
 
+### Releasing this repo
+
 * This project Eats Its Own Dog Food™. It uses a plain text `VERSION` file to store its version. Use the
-  script `./release-this`. It uses the preset `--dev-qa` as of this writing.
+  script `./release`. It uses the preset `--dev-qa` as of this writing.
 * `release.sh` implements the release workflow, but needs `getVersion_xxx` & `setVersion_xxx` functions for eah
   particular technology. They are all located in the `release.sh` file.
+* In order to prevent a conflict with this repo's `release.sh` file, the `release` script downloads `release.sh`
+  as `release.sh.this`.
+
+### Testing
 
 * Tests are in `test/`
-    * Run `test/test-all.sh`
+    * Run `test/polyrepos/test-all.sh` to test the behavior against individual, polyrepo-style git repos.
+    * Run `test/monorepo/test.sh` to test against a monorepo that has every technology supported by this tool.
     * There needs to be (more) assertions in the tests, and we need better saddy path coverage.
 * To add a technology, copy & paste an existing one:
     * Copy an existing technology-specific section in `release.sh` (near the top) & massage to fit the new technology.
-    * Update `test/test-all.sh` to add your new type to those tested.
+    * Update `test/polyrepos/**/*` to add your new type to those tested.
+    * Update `test/monorepo/**/*` to add your new type to the monorepo under test.

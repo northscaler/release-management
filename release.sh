@@ -53,14 +53,13 @@
 
 set -e
 
+RM_DEBUG=${RM_DEBUG:-""}
+
 RM_ERR_INVOCATION=1
 RM_ERR_VERSIONS=2
 RM_ERR_GIT_STATE=3
 
-THIS_ABSPATH="$(
-  cd "$(dirname "$0")"
-  pwd
-)"
+THIS_ABSPATH="$(realpath "$0")"
 
 verbose() {
   if [ -n "$RM_VERBOSE" ]; then
@@ -96,27 +95,31 @@ RM_DEFAULT_RC=${RM_DEFAULT_RC:-rc}
 RM_PRE=${RM_PRE:-$RM_DEFAULT_PRE}
 RM_RC=${RM_RC:-$RM_DEFAULT_RC}
 RM_VERBOSE=${RM_VERBOSE:-''}
-RM_CHERRY_PICK_RELEASE_COMMIT_TO_MAIN=1
+RM_CHERRY_PICK_FIRST_RC_COMMIT_TO_MAIN=1
 
 #####
 ##### begin Helm Chart support
 #####
 RM_HELM_CHART_DIR=${RM_HELM_CHART_DIR:-$(pwd)}
-RM_HELM_CHART_FILE="${RM_HELM_CHART_FILE:-Chart.yaml}"
 
 getVersion_helm() {
-  local RM_HELM_CHART_FILE_PATHNAME="$RM_HELM_CHART_DIR/$RM_HELM_CHART_FILE"
-  cat "$RM_HELM_CHART_FILE_PATHNAME" | $YMLX this.version
+  local RM_HELM_CHART_DIR_PATHNAME="$1"
+
+  eval "$YMLX this.version" < "$RM_HELM_CHART_DIR_PATHNAME/Chart.yaml"
 }
 
 setVersion_helm() {
   local V=$1
-  local RM_HELM_CHART_FILE_PATHNAME="$RM_HELM_CHART_DIR/$RM_HELM_CHART_FILE"
+  local RM_HELM_CHART_DIR_PATHNAME="$2"
+  local RM_HELM_CHART_FILE_PATHNAME="$RM_HELM_CHART_DIR_PATHNAME/Chart.yaml"
   local FC="$(cat $RM_HELM_CHART_FILE_PATHNAME)"
+
   echo "$FC" \
-    | $YMLX "it => { it.version = \"$V\"; return it; }" \
-    > $RM_HELM_CHART_FILE_PATHNAME
-  verbose "$RM_HELM_CHART_FILE_PATHNAME is now: $(cat "$RM_HELM_CHART_FILE_PATHNAME")"
+    | eval "$YMLX 'it => { it.version = \"$V\"; return it; }'" \
+    > "$RM_HELM_CHART_FILE_PATHNAME"
+
+  verbose "INFO: $RM_HELM_CHART_FILE_PATHNAME is now:"
+  verbose "$(cat "$RM_HELM_CHART_FILE_PATHNAME")"
 }
 #####
 ##### end Helm Chart support
@@ -125,25 +128,32 @@ setVersion_helm() {
 #####
 ##### begin C# support
 #####
+RM_CSHARP_DIR="${RM_CSHARP_DIR:-$(pwd)}"
 RM_CSHARP_FILE="${RM_CSHARP_FILE:-AssemblyInfo.cs}"
 RM_CSHARP_ENTRY="${RM_CSHARP_ENTRY:-AssemblyInformationalVersion}"
 
 getVersion_csharp() {
-  cat "$RM_CSHARP_FILE" | grep "$RM_CSHARP_ENTRY" | $MATCH \".*\" | sed 's/"//g'
+  local RM_CSHARP_FILE_PATHNAME="$1"
+
+  grep -E "$RM_CSHARP_ENTRY" < "$RM_CSHARP_FILE_PATHNAME" | eval "$MATCH '(\d+\.\d+\.\d+(-.+\.\d+)?)'" | awk '{ print $1 }'
 }
 
 setVersion_csharp() {
-  local VER="$(echo "$1" | $MATCH '([0-9]{1,}\.[0-9]{1,}\.[0-9]{1,})' | awk '{print $2}')"
-  local FV="$VER.0"
+  local VER="$(echo "$1" | eval "$MATCH '([0-9]{1,}\.[0-9]{1,}\.[0-9]{1,})'" | awk '{print $2}')"
+  local AFV="$VER.0"
   local AV="$VER.*"
 
-  local FC="$(cat "$RM_CSHARP_FILE")"
+  local RM_CSHARP_FILE_PATHNAME="$2"
+  local FC="$(cat "$RM_CSHARP_FILE_PATHNAME")"
+
   echo "$FC" \
-  | sed "s/AssemblyFileVersion.*/AssemblyFileVersion\(\"$FV\"\)]/" \
+  | sed "s/AssemblyFileVersion.*/AssemblyFileVersion\(\"$AFV\"\)]/" \
   | sed "s/AssemblyVersion.*/AssemblyVersion\(\"$AV\"\)]/" \
-  | sed "s/AssemblyInformationalVersion.*/AssemblyInformationalVersion\(\"$1\"\)]/" \
-  > "$RM_CSHARP_FILE"
-  verbose "$RM_CSHARP_FILE is now: $(cat cat "$RM_CSHARP_FILE")"
+  | sed "s/$RM_CSHARP_ENTRY.*/$RM_CSHARP_ENTRY\(\"$1\"\)]/" \
+  > "$RM_CSHARP_FILE_PATHNAME"
+
+  verbose "INFO: $RM_CSHARP_FILE_PATHNAME is now:"
+  verbose "$(cat "$RM_CSHARP_FILE_PATHNAME")"
 }
 #####
 ##### end C# support
@@ -152,19 +162,26 @@ setVersion_csharp() {
 #####
 ##### begin gradle support
 #####
+RM_GRADLE_DIR="${RM_GRADLE_DIR:-$(pwd)}"
 RM_GRADLE_FILE="${RM_GRADLE_FILE:-build.gradle}"
 
 getVersion_gradle() {
-  cat "$RM_GRADLE_FILE" | egrep "^version" | $MATCH \'.*\' | sed "s/'//g"
+  local RM_GRADLE_FILE_PATHNAME="$1"
+
+  grep -E "^version" < "$RM_GRADLE_FILE_PATHNAME" | eval "$MATCH \'.*\'" | sed "s/'//g"
 }
 
 setVersion_gradle() {
   local V=$1
-  local FC="$(cat "$RM_GRADLE_FILE")"
+  local RM_GRADLE_FILE_PATHNAME="$2"
+  local FC="$(cat "$RM_GRADLE_FILE_PATHNAME")"
+
   echo "$FC" \
   | sed "s/^version.*/version = \'$V\'/" \
-  > "$RM_GRADLE_FILE"
-  verbose "$RM_GRADLE_FILE is now: $(cat cat "$RM_GRADLE_FILE")"
+  > "$RM_GRADLE_FILE_PATHNAME"
+
+  verbose "INFO: $RM_GRADLE_FILE_PATHNAME is now:"
+  verbose "$(cat "$RM_GRADLE_FILE_PATHNAME")"
 }
 #####
 ##### end gradle support
@@ -173,21 +190,27 @@ setVersion_gradle() {
 #####
 ##### begin gradlekts support
 #####
+RM_GRADLE_KOTLIN_DIR="${RM_GRADLE_KOTLIN_DIR:-$(pwd)}"
 RM_GRADLE_KOTLIN_FILE="${RM_GRADLE_KOTLIN_FILE:-build.gradle.kts}"
 
 getVersion_gradlekts() {
-  cat "$RM_GRADLE_KOTLIN_FILE" | egrep "^version" | egrep -o "['\"].*['\"]" | tr '"' ' ' | tr "'" ' ' | xargs
+  local RM_GRADLE_KOTLIN_FILE_PATHNAME="$1"
+
+  grep -E "^version" < "$RM_GRADLE_KOTLIN_FILE_PATHNAME" | grep -Eo "['\"].*['\"]" | tr '"' ' ' | tr "'" ' ' | xargs
 }
 
 # usage: setVersion version
 setVersion_gradlekts() {
   local V=$1
+  local RM_GRADLE_KOTLIN_FILE_PATHNAME="$2"
+  local FC="$(cat "$RM_GRADLE_KOTLIN_FILE_PATHNAME")"
 
-  local FC="$(cat "$RM_GRADLE_KOTLIN_FILE")"
   echo "$FC" \
   | sed "s/^version.*/version = \"$V\"/" \
-  > "$RM_GRADLE_KOTLIN_FILE"
-  verbose "$RM_GRADLE_KOTLIN_FILE is now: $(cat cat "$RM_GRADLE_KOTLIN_FILE")"
+  > "$RM_GRADLE_KOTLIN_FILE_PATHNAME"
+
+  verbose "INFO: $RM_GRADLE_KOTLIN_FILE_PATHNAME is now:"
+  verbose "$(cat "$RM_GRADLE_KOTLIN_FILE_PATHNAME")"
 }
 #####
 ##### end gradlekts support
@@ -196,20 +219,25 @@ setVersion_gradlekts() {
 #####
 ##### begin Docker image support
 #####
+RM_DOCKER_DIR="${RM_DOCKER_DIR:-$(pwd)}"
 RM_DOCKER_FILE="${RM_DOCKER_FILE:-Dockerfile}"
 RM_DOCKER_VERSION_LABEL="${RM_DOCKER_VERSION_LABEL:-version}"
 
 getVersion_docker() {
-  echo "$(egrep '^LABEL' "$RM_DOCKER_FILE" | egrep -o "$RM_DOCKER_VERSION_LABEL=\"?[0-9]+\.[0-9]+\.[0-9]+(-[^ \"]*)?\"?" | cut -d'=' -f2 | sed 's/"//g')"
+  local RM_DOCKER_FILE_PATHNAME="$1"
+
+  echo "$(grep -E '^LABEL' "$RM_DOCKER_FILE_PATHNAME" | grep -Eo "$RM_DOCKER_VERSION_LABEL=\"?[0-9]+\.[0-9]+\.[0-9]+(-[^ \"]*)?\"?" | cut -d'=' -f2 | sed 's/"//g')"
 }
 
 setVersion_docker() {
   local V=$1
+  local RM_DOCKER_FILE_PATHNAME="$2"
   local label
   local first=true
   local lines
-  printf "$(cat "$RM_DOCKER_FILE")\n" | while read line; do
-    label="$(echo "$line"  | egrep '^LABEL' | egrep "$RM_DOCKER_VERSION_LABEL=\"?[0-9]+\.[0-9]+\.[0-9]+(-[^ \"]*)?\"?" || true)"
+
+  printf "$(cat "$RM_DOCKER_FILE_PATHNAME")\n" | while read line; do
+    label="$(echo "$line"  | grep -E '^LABEL' | grep -E "$RM_DOCKER_VERSION_LABEL=\"?[0-9]+\.[0-9]+\.[0-9]+(-[^ \"]*)?\"?" || true)"
     if [ -z "$label" ]; then # skip it
       if [ $first = true ]; then
         first=false
@@ -221,12 +249,13 @@ setVersion_docker() {
       line="$(echo "$label" | sed -E "s/$RM_DOCKER_VERSION_LABEL=\"?[0-9]+\.[0-9]+\.[0-9]+(-[^ \"]*)?\"?/$RM_DOCKER_VERSION_LABEL=$1/")"
       lines="$lines\n$line"
     fi
-    printf "$lines" > "$RM_DOCKER_FILE"
+    printf "$lines" > "$RM_DOCKER_FILE_PATHNAME"
   done
-  lines="$(cat "$RM_DOCKER_FILE")\n"
-  printf "$lines" > "$RM_DOCKER_FILE"
+  lines="$(cat "$RM_DOCKER_FILE_PATHNAME")\n"
+  printf "$lines" > "$RM_DOCKER_FILE_PATHNAME"
 
-  verbose "$RM_DOCKER_FILE is now: $(cat cat "$RM_DOCKER_FILE")"
+  verbose "INFO: $RM_DOCKER_FILE_PATHNAME is now:"
+  verbose "$(cat "$RM_DOCKER_FILE_PATHNAME")"
 }
 #####
 ##### end Docker image support
@@ -235,18 +264,24 @@ setVersion_docker() {
 #####
 ##### begin Maven pom.xml support
 #####
+RM_MAVEN_DIR="${RM_MAVEN_DIR:-$(pwd)}"
 RM_MAVEN_FILE="${RM_MAVEN_FILE:-pom.xml}"
 
 getVersion_maven() {
-  cat "$RM_MAVEN_FILE" | $XMLSTARLET sel -N x=http://maven.apache.org/POM/4.0.0 -t -v /x:project/x:version -
+  local RM_MAVEN_FILE_PATHNAME="$1"
+
+  eval "$XMLSTARLET sel -N x=http://maven.apache.org/POM/4.0.0 -t -v /x:project/x:version -" < "$RM_MAVEN_FILE_PATHNAME"
 }
 
 setVersion_maven() {
   local V=$1
+  local RM_MAVEN_FILE_PATHNAME="$2"
 
-  cat "$RM_MAVEN_FILE" | $XMLSTARLET ed -P -N x=http://maven.apache.org/POM/4.0.0 -u /x:project/x:version -v $V > "$RM_MAVEN_FILE.tmp"
-  mv "$RM_MAVEN_FILE.tmp" "$RM_MAVEN_FILE"
-  verbose "$RM_MAVEN_FILE is now: $(cat "$RM_MAVEN_FILE")"
+  eval "$XMLSTARLET ed -P -N x=http://maven.apache.org/POM/4.0.0 -u /x:project/x:version -v $V" > "$RM_MAVEN_FILE_PATHNAME.tmp" < "$RM_MAVEN_FILE_PATHNAME"
+  mv "$RM_MAVEN_FILE_PATHNAME.tmp" "$RM_MAVEN_FILE_PATHNAME"
+
+  verbose "INFO: $RM_MAVEN_FILE_PATHNAME is now:"
+  verbose "$(cat "$RM_MAVEN_FILE_PATHNAME")"
 }
 #####
 ##### end Maven pom.xml support
@@ -255,28 +290,36 @@ setVersion_maven() {
 #####
 ##### begin nodejs package.json support
 #####
-RM_NODEJS_PACKAGE_JSON="${RM_NODEJS_PACKAGE_JSON:-package.json}"
-RM_NODEJS_PACKAGE_JSON_DIR="$(dirname "$RM_NODEJS_PACKAGE_JSON" | sed -E "s|^\.|$PWD|")"
-
-RM_NODEJS_DOCKER="docker run --rm -i -v $RM_NODEJS_PACKAGE_JSON_DIR:$RM_NODEJS_PACKAGE_JSON_DIR -w $RM_NODEJS_PACKAGE_JSON_DIR node"
-RM_NODEJS_NODE=node
-if [ -n "$NO_USE_LOCAL_NODEJS" ] || ! $RM_NODEJS_NODE --version >/dev/null 2>&1; then
-  RM_NODEJS_NODE="$RM_NODEJS_DOCKER node"
-fi
-
-RM_NODEJS_NPM=npm
-if [ -n "$NO_USE_LOCAL_NPM" ] || ! $RM_NODEJS_NPM --version >/dev/null 2>&1; then
-  RM_NODEJS_NPM="$RM_NODEJS_DOCKER npm"
-fi
+RM_NODEJS_DIR="${RM_NODEJS_DIR:-$(pwd)}"
 
 getVersion_nodejs() {
-  (cd "$RM_NODEJS_PACKAGE_JSON_DIR" && $RM_NODEJS_NODE -e 'console.log(require("./package.json").version)')
+  local RM_NODEJS_DIR_PATHNAME="$1"
+  RM_NODEJS_DIR_PATHNAME="$(realpath "$RM_NODEJS_DIR_PATHNAME")"
+
+  local RM_NODEJS_DOCKER="docker run --rm -i -v $RM_NODEJS_DIR_PATHNAME:/cwd -w /cwd node"
+  local RM_NODEJS_NODE=node
+  if [ -n "$NO_USE_LOCAL_NODEJS" ] || ! eval "$RM_NODEJS_NODE --version" >/dev/null 2>&1; then
+    RM_NODEJS_NODE="$RM_NODEJS_DOCKER node"
+  fi
+
+  eval "$RM_NODEJS_NODE -e 'console.log(require(\"./package.json\").version)'"
 }
 
 setVersion_nodejs() {
   local V=$1
-  (cd "$RM_NODEJS_PACKAGE_JSON_DIR" && $RM_NODEJS_NPM version --no-git-tag-version --allow-same-version $V)
-  verbose "$RM_NODEJS_PACKAGE_JSON is now: $(cat "$RM_NODEJS_PACKAGE_JSON")"
+  local RM_NODEJS_DIR_PATHNAME="$2"
+  RM_NODEJS_DIR_PATHNAME="$(realpath "$RM_NODEJS_DIR_PATHNAME")"
+  local RM_NODEJS_DOCKER="docker run --rm -i -v $RM_NODEJS_DIR_PATHNAME:/cwd -w /cwd node"
+
+  RM_NODEJS_NPM=npm
+  if [ -n "$NO_USE_LOCAL_NPM" ] || ! eval "$RM_NODEJS_NPM --version" >/dev/null 2>&1; then
+    RM_NODEJS_NPM="$RM_NODEJS_DOCKER npm"
+  fi
+
+  (cd "$RM_NODEJS_DIR_PATHNAME" && eval "$RM_NODEJS_NPM version --no-git-tag-version --allow-same-version $V")
+
+  verbose "INFO: $RM_NODEJS_DIR_PATHNAME/package.json is now:"
+  verbose "$(cat "$RM_NODEJS_DIR_PATHNAME/package.json")"
 }
 #####
 ##### end nodejs package.json support
@@ -285,20 +328,26 @@ setVersion_nodejs() {
 #####
 ##### begin Scala SBT support
 #####
+RM_SCALA_SBT_DIR="${RM_SCALA_SBT_DIR:-$(pwd)}"
 RM_SCALA_SBT_FILE="${RM_SCALA_SBT_FILE:-build.sbt}"
 
-getVersion_sbt() {
-  cat "$RM_SCALA_SBT_FILE" | egrep "^version\s*\:\=.*" | $MATCH \".*\" | sed 's/"//g'
+getVersion_scala() {
+  local RM_SCALA_SBT_FILE_PATHNAME="$1"
+
+  grep -E '^\s*version\s*:=\s*".*"\s*$' < "$RM_SCALA_SBT_FILE_PATHNAME" | eval "$MATCH '(\d+\.\d+\.\d+(-.+\.\d+)?)'" | awk '{ print $1 }'
 }
 
-setVersion_sbt() {
+setVersion_scala() {
   local V=$1
+  local RM_SCALA_SBT_FILE_PATHNAME="$2"
+  local FC="$(cat "$RM_SCALA_SBT_FILE_PATHNAME")"
 
-  local FC="$(cat "$RM_SCALA_SBT_FILE")"
   echo "$FC" \
-  | sed "s/^version.*/version := \"$V\"/" \
-  > "$RM_SCALA_SBT_FILE"
-  verbose "$RM_SCALA_SBT_FILE is now: $(cat "$RM_SCALA_SBT_FILE")"
+  | sed -E "s/^\s*version *:= *\".+\" *$/version := \"$V\"/" \
+  > "$RM_SCALA_SBT_FILE_PATHNAME"
+
+  verbose "INFO: $RM_SCALA_SBT_FILE_PATHNAME is now:"
+  verbose "$(cat "$RM_SCALA_SBT_FILE_PATHNAME")"
 }
 #####
 ##### end Scala SBT support
@@ -307,16 +356,23 @@ setVersion_sbt() {
 #####
 ##### begin VERSION file support
 #####
+RM_VERSION_DIR="${RM_VERSION_DIR:-$(pwd)}"
 RM_VERSION_FILE="${RM_VERSION_FILE:-VERSION}"
 
 getVersion_version() {
-  cat "$RM_VERSION_FILE" | xargs
+  local RM_VERSION_FILE_PATHNAME="$1"
+
+  xargs < "$RM_VERSION_FILE_PATHNAME"
 }
 
 setVersion_version() {
   local V=$1
-  echo "$V" > "$RM_VERSION_FILE"
-  verbose "$RM_VERSION_FILE is now: $(cat "$RM_VERSION_FILE")"
+  local RM_VERSION_FILE_PATHNAME="$2"
+
+  echo "$V" > "$RM_VERSION_FILE_PATHNAME"
+
+  verbose "INFO: $RM_VERSION_FILE_PATHNAME is now:"
+  verbose "$(cat "$RM_VERSION_FILE_PATHNAME")"
 }
 #####
 ##### end VERSION file support
@@ -325,46 +381,45 @@ setVersion_version() {
 usage() {
   echo "This script performs release commits, tags & branching.  Usage:"
 
-  printf "%s --tech tech1,tech2,... [options] $RM_PRE|$RM_RC|minor|patch\n \
-  where options are as follows (last one wins):\n \
-  --tech|-t                           # required at least once, the technology types to release (comma-delimited list ok); choose from:\n \
-                                      #  'helm' for Helm Chart (Chart.yaml),\n \
-                                      #  'docker' for Docker Image (Dockerfile),\n \
-                                      #  'nodejs' for Node.js (package.json),\n \
-                                      #  'csharp' for C# (AssemblyInformationalVersion in AssemblyInfo.cs),\n \
-                                      #  'scala' for Scala (build.sbt),\n \
-                                      #  'gradle' for Gradle (build.gradle),\n \
-                                      #  'gradlekts' for Kotlin Gradle (build.gradle.kts),\n \
-                                      #  'maven' for Maven XML (pom.xml),\n \
-                                      #  'version' for plain text version file (VERSION),\n \
-  [--origin|-o origin]                # optional, git origin, default '%s'\n \
-  [--main|-m main]                    # optional, git main branch, default '%s'\n \
-  [--cherry-pick-to-main]             # optional, cherry pick release commit to main branch, default true\n \
-  [--no-cherry-pick-to-main]          # optional, don't cherry pick release commit to main branch, default false\n \
-  [--release-tag-prefix|-p prefix]    # optional, git release tag prefix, default '%s'\n \
-  [--release-tag-suffix|-s suffix]    # optional, git release tag suffix, default  '%s'\n \
-  [--release-branch-prefix|-P prefix] # optional, git release branch prefix, default '%s'\n \
-  [--release-branch-suffix|-S suffix] # optional, git release branch suffix, default '%s' ('.x' is common)\n \
-  [--git-commit-opts|-o opts]         # optional, git commit options, default '%s' ('--no-verify' is common)\n \
-  [--git-push-opts|-O opts]           # optional, git commit options, default '%s' ('--no-verify' is common)\n \
-  [--pre-release-token|-k token]      # optional, pre release token, default '%s'\n \
-  [--rc-release-token|-K token]       # optional, release candidate release token, default '%s'\n \
-  [--dev-qa]                          # optional, shortcut for '--main dev --pre-release-token dev --rc-release-token qa'\n \
-  [--alpha-beta]                      # optional, shortcut for '--main alpha --pre-release-token alpha --rc-release-token beta'\n \
-  [--pre-rc]                          # optional, shortcut for '--main master --pre-release-token pre --rc-release-token rc' (legacy behavior)\n \
-  [--helm-chart-dir chartDir]         # optional, chart directory, default cwd ('%s')\n \
-  [--helm-chart-file chartFile]       # optional, chart filename, default '%s'\n \
-  [--csharp-file csharpFile]          # optional, csharp filename, default '%s'\n \
-  [--gradle-file gradleFile]          # optional, gradle filename, default '%s'\n \
-  [--gradlekts-file gradlektsFile]    # optional, gradlekts filename, default '%s'\n \
-  [--docker-file dockerFile]          # optional, docker filename, default '%s'\n \
-  [--docker-file-version-label label] # optional, docker file version label, default '%s'\n \
-  [--maven-file mavenFile]            # optional, maven POM filename, default '%s'\n \
-  [--nodejs-file packageJson]         # optional, nodejs filename, default '%s'\n \
-  [--scala-file buildSbt]             # optional, scala filename, default '%s'\n \
-  [--version-file versionFile]        # optional, version filename, default '%s'\n \
-  [--verbose|-v]                      # optional, displays detailed progress\n \
-  [--help|-h]                         # optional, displays usage\n" \
+  printf "%s [--tech tech1,tech2,...] [options] $RM_PRE|$RM_RC|minor|patch\n \
+  where options are as follows:\n \
+  --tech|-t                                 # required or implied by other arguments at least once, the technology types to release (comma-delimited list ok); choose from:\n \
+                                            #  'helm' for Helm Chart (Chart.yaml),\n \
+                                            #  'docker' for Docker Image (Dockerfile),\n \
+                                            #  'nodejs' for Node.js (package.json),\n \
+                                            #  'csharp' for C# (AssemblyInformationalVersion in AssemblyInfo.cs),\n \
+                                            #  'scala' for Scala (build.sbt),\n \
+                                            #  'gradle' for Gradle (build.gradle),\n \
+                                            #  'gradlekts' for Kotlin Gradle (build.gradle.kts),\n \
+                                            #  'maven' for Maven XML (pom.xml),\n \
+                                            #  'version' for plain text version file (VERSION),\n \
+  [--origin|-o origin]                      # optional, git origin, default '%s' (if given multiple times, last one wins)\n \
+  [--main|-m main]                          # optional, git main branch, default '%s' (if given multiple times, last one wins)\n \
+  [--cherry-pick-to-main]                   # optional, cherry pick first RC release commit to main branch, default true (if given multiple times, last one wins)\n \
+  [--no-cherry-pick-to-main]                # optional, don't cherry pick first RC release commit to main branch, default false (if given multiple times, last one wins)\n \
+  [--release-tag-prefix|-p prefix]          # optional, git release tag prefix, default '%s' (if given multiple times, last one wins)\n \
+  [--release-tag-suffix|-s suffix]          # optional, git release tag suffix, default  '%s' (if given multiple times, last one wins)\n \
+  [--release-branch-prefix|-P prefix]       # optional, git release branch prefix, default '%s' (if given multiple times, last one wins)\n \
+  [--release-branch-suffix|-S suffix]       # optional, git release branch suffix, default '%s' (if given multiple times, last one wins)\n \
+  [--git-commit-opts|-o opts]               # optional, git commit options ('--no-verify' is common), default '%s' (if given multiple times, last one wins)\n \
+  [--git-push-opts|-O opts]                 # optional, git push options ('--no-verify' is common), default '%s' (if given multiple times, last one wins)\n \
+  [--pre-release-token|-k token]            # optional, pre release token, default '%s' (if given multiple times, last one wins)\n \
+  [--rc-release-token|-K token]             # optional, release candidate release token, default '%s' (if given multiple times, last one wins)\n \
+  [--dev-qa]                                # optional, shortcut for '--main dev --pre-release-token dev --rc-release-token qa' (if other shortcut options given multiple times, last one wins)\n \
+  [--alpha-beta]                            # optional, shortcut for '--main alpha --pre-release-token alpha --rc-release-token beta' (if other shortcut options given multiple times, last one wins)\n \
+  [--pre-rc]                                # optional, shortcut for legacy behavior of '--main master --pre-release-token pre --rc-release-token rc' (if other shortcut options given multiple times, last one wins)\n \
+  [--helm-chart-dir chartDir]               # optional, chart directory (option allowed multiple times) or colon-separated pathnames to chart directories, if given implies '--tech helm', default cwd ('%s')\n \
+  [--csharp-file csharpFile]                # optional, csharp filename (option allowed multiple times) or colon-separated pathnames to csharp filenames, if given implies '--tech csharp', default '%s'\n \
+  [--gradle-file gradleFile]                # optional, gradle filename (option allowed multiple times) or colon-separated pathnames to gradle filenames, if given implies '--tech gradle', default '%s'\n \
+  [--gradlekts-file gradlektsFile]          # optional, gradlekts filename (option allowed multiple times) or colon-separated pathnames to gradlekts filenames, if given implies '--tech gradlekts', default '%s'\n \
+  [--docker-file dockerFile]                # optional, docker filename (option allowed multiple times) or colon-separated pathnames to docker filenames, if given implies '--tech docker', default '%s'\n \
+  [--docker-file-version-label label]       # optional, docker file version label, if given implies '--tech docker', default '%s'\n \
+  [--maven-file mavenFile]                  # optional, maven POM filename (option allowed multiple times) or colon-separated pathnames to maven POM filenames, if given implies '--tech maven', default '%s'\n \
+  [--nodejs-dir nodejsDir]                  # optional, nodejs project directory (option allowed multiple times) or colon-separated pathnames to nodejs project directories, if given implies '--tech nodejs', default '%s'\n \
+  [--scala-file buildSbt]                   # optional, scala SBT filename (option allowed multiple times) or colon-separated pathnames to scala SBT filenames, if given implies '--tech scala', default '%s'\n \
+  [--version-file versionFile]              # optional, VERSION file filename (option allowed multiple times) or colon-separated pathnames to VERSION file filenames, if given implies '--tech version', default '%s'\n \
+  [--verbose|-v]                            # optional, displays detailed progress\n \
+  [--help|-h]                               # optional, displays usage\n" \
     "$0" \
     "$RM_ORIGIN" \
     "$RM_MAIN" \
@@ -377,20 +432,27 @@ usage() {
     "$RM_PRE" \
     "$RM_RC" \
     "$RM_HELM_CHART_DIR" \
-    "$RM_HELM_CHART_FILE" \
-    "$RM_CSHARP_FILE" \
-    "$RM_GRADLE_FILE" \
-    "$RM_GRADLE_KOTLIN_FILE" \
-    "$RM_DOCKER_FILE" \
+    "$RM_CSHARP_DIR/$RM_CSHARP_FILE" \
+    "$RM_GRADLE_DIR/$RM_GRADLE_FILE" \
+    "$RM_GRADLE_KOTLIN_DIR/$RM_GRADLE_KOTLIN_FILE" \
+    "$RM_DOCKER_DIR/$RM_DOCKER_FILE" \
     "$RM_DOCKER_VERSION_LABEL" \
-    "$RM_MAVEN_FILE" \
-    "$RM_NODEJS_PACKAGE_JSON" \
-    "$RM_SCALA_SBT_FILE" \
-    "$RM_VERSION_FILE"
+    "$RM_MAVEN_DIR/$RM_MAVEN_FILE" \
+    "$RM_NODEJS_DIR" \
+    "$RM_SCALA_DIR/$RM_SCALA_FILE" \
+    "$RM_VERSION_DIR/$RM_VERSION_FILE"
+}
+
+debug() {
+  if [ -n "$RM_DEBUG" ]; then
+    echo "$*" >&2
+  fi
 }
 
 # process args
 while [ $# -gt 0 ]; do
+  debug "args: $*"
+
   case "$1" in
   --tech | -t)
     shift
@@ -461,67 +523,88 @@ while [ $# -gt 0 ]; do
     ;;
   --cherry-pick-to-main)
     shift
-    RM_CHERRY_PICK_RELEASE_COMMIT_TO_MAIN=1
+    RM_CHERRY_PICK_FIRST_RC_COMMIT_TO_MAIN=1
     ;;
   --no-cherry-pick-to-main)
     shift
-    RM_CHERRY_PICK_RELEASE_COMMIT_TO_MAIN=
+    RM_CHERRY_PICK_FIRST_RC_COMMIT_TO_MAIN=
     ;;
   --helm-chart-dir)
     shift
-    RM_HELM_CHART_DIR="$1"
+    RM_PATHNAMES_helm=":$RM_PATHNAMES_helm:$1"
     shift
+    RM_TECH="$RM_TECH,helm"
     ;;
-  --helm-chart-file)
+  --helm-chart-file) # deprecated because filename "Chart.yaml" is not configurable in node.js
     shift
     RM_HELM_CHART_FILE="$1"
     shift
+    RM_HELM_CHART_FILE="$(realpath "$(dirname "$RM_HELM_CHART_FILE")")"
+    echo "WARN: option --helm-chart-file is deprecated because filename 'Chart.yaml' is not configurable; assuming '--helm-chart-dir $RM_HELM_CHART_FILE' instead" >&2
+    RM_PATHNAMES_helm=":$RM_PATHNAMES_helm:$RM_HELM_CHART_FILE:"
+    RM_TECH="$RM_TECH,helm"
     ;;
   --csharp-file)
     shift
-    RM_CSHARP_FILE="$1"
+    RM_PATHNAMES_csharp=":$RM_PATHNAMES_csharp:$1:"
     shift
+    RM_TECH="$RM_TECH,csharp"
     ;;
   --gradle-file)
     shift
-    RM_GRADLE_FILE="$1"
+    RM_PATHNAMES_gradle="$RM_PATHNAMES_gradle:$1:"
     shift
+    RM_TECH="$RM_TECH,gradle"
     ;;
   --gradlekts-file)
     shift
-    RM_GRADLE_KOTLIN_FILE="$1"
+    RM_PATHNAMES_gradlekts="$RM_PATHNAMES_gradlekts:$1:"
     shift
+    RM_TECH="$RM_TECH,gradlekts"
     ;;
   --docker-file)
     shift
-    RM_DOCKER_FILE="$1"
+    RM_PATHNAMES_docker=":$RM_PATHNAMES_docker:$1:"
     shift
+    RM_TECH="$RM_TECH,docker"
     ;;
   --docker-file-version-label)
     shift
     RM_DOCKER_VERSION_LABEL="$1"
     shift
+    RM_TECH="$RM_TECH,docker"
     ;;
   --maven-file)
     shift
-    RM_MAVEN_FILE="$1"
+    RM_PATHNAMES_maven=":$RM_PATHNAMES_maven:$1:"
     shift
+    RM_TECH="$RM_TECH,maven"
     ;;
   --scala-file)
     shift
-    RM_SCALA_SBT_FILE="$1"
+    RM_PATHNAMES_scala=":$RM_PATHNAMES_scala:$1:"
     shift
+    RM_TECH="$RM_TECH,scala"
     ;;
-  --nodejs-file)
+  --nodejs-file) # deprecated because filename "package.json" is not configurable in node.js
     shift
-    RM_NODEJS_PACKAGE_JSON="$1"
-    RM_NODEJS_PACKAGE_JSON_DIR="$(dirname "$RM_NODEJS_PACKAGE_JSON" | sed -E "s|^\.|$PWD|")"
+    RM_NODEJS_FILE="$1"
     shift
+    RM_NODEJS_FILE="$(realpath "$(dirname "$RM_NODEJS_FILE")")"
+    echo "WARN: option --nodejs-file is deprecated because filename 'package.json' is not configurable; assuming '--nodejs-dir $RM_NODEJS_FILE' instead" >&2
+    RM_PATHNAMES_nodejs=":$RM_PATHNAMES_nodejs:$RM_NODEJS_FILE:"
+    ;;
+  --nodejs-dir)
+    shift
+    RM_PATHNAMES_nodejs=":$RM_PATHNAMES_nodejs:$1:"
+    shift
+    RM_TECH="$RM_TECH,nodejs"
     ;;
   --version-file)
     shift
-    RM_VERSION_FILE="$1"
+    RM_PATHNAMES_version=":$RM_PATHNAMES_version:$1:"
     shift
+    RM_TECH="$RM_TECH,version"
     ;;
   --help | -h)
     usage >&2
@@ -538,15 +621,55 @@ while [ $# -gt 0 ]; do
   esac
 done
 
-# validations
-
 # ensure at least one tech given
-RM_TECHNOLOGIES="$(echo -n "$RM_TECH" | tr ',' ' ' | xargs)"
+RM_TECHNOLOGIES="$(echo -n "$RM_TECH" | tr ',' '\n' | uniq | xargs)"
 if [ -z "$RM_TECHNOLOGIES" ]; then
-  echo "ERROR: no technologies given" >&2
+  echo "ERROR: no technologies given or implied" >&2
   usage >&2
   exit $RM_ERR_INVOCATION
 fi
+
+# default things if necessary
+if [ -z "$RM_PATHNAMES_helm" ] && echo "$RM_TECHNOLOGIES" | grep -Eq '(^|\s+)helm(\s+|$)'; then
+  RM_PATHNAMES_helm="$(realpath "$RM_HELM_CHART_DIR/$RM_HELM_CHART_FILE")"
+fi
+if [ -z "$RM_PATHNAMES_csharp" ] && echo "$RM_TECHNOLOGIES" | grep -Eq '(^|\s+)csharp(\s+|$)'; then
+  RM_PATHNAMES_csharp="$(realpath "$RM_CSHARP_DIR/$RM_CSHARP_FILE")"
+fi
+if [ -z "$RM_PATHNAMES_gradle" ] && echo "$RM_TECHNOLOGIES" | grep -Eq '(^|\s+)gradle(\s+|$)'; then
+  RM_PATHNAMES_gradle="$(realpath "$RM_GRADLE_DIR/$RM_GRADLE_FILE")"
+fi
+if [ -z "$RM_PATHNAMES_gradlekts" ] && echo "$RM_TECHNOLOGIES" | grep -Eq '(^|\s+)gradlekts(\s+|$)'; then
+  RM_PATHNAMES_gradlekts="$(realpath "$RM_GRADLE_KOTLIN_DIR/$RM_GRADLE_KOTLIN_FILE")"
+fi
+if [ -z "$RM_PATHNAMES_docker" ] && echo "$RM_TECHNOLOGIES" | grep -Eq '(^|\s+)docker(\s+|$)'; then
+  RM_PATHNAMES_docker="$(realpath "$RM_DOCKER_DIR/$RM_DOCKER_FILE")"
+fi
+if [ -z "$RM_PATHNAMES_maven" ] && echo "$RM_TECHNOLOGIES" | grep -Eq '(^|\s+)maven(\s+|$)'; then
+  RM_PATHNAMES_maven="$(realpath "$RM_MAVEN_DIR/$RM_MAVEN_FILE")"
+fi
+if [ -z "$RM_PATHNAMES_scala" ] && echo "$RM_TECHNOLOGIES" | grep -Eq '(^|\s+)scala(\s+|$)'; then
+  RM_PATHNAMES_scala="$(realpath "$RM_SCALA_SBT_DIR/$RM_SCALA_SBT_FILE")"
+fi
+if [ -z "$RM_PATHNAMES_nodejs" ] && echo "$RM_TECHNOLOGIES" | grep -Eq '(^|\s+)nodejs(\s+|$)'; then
+  RM_PATHNAMES_nodejs="$(realpath "$RM_NODEJS_DIR")"
+fi
+if [ -z "$RM_PATHNAMES_version" ] && echo "$RM_TECHNOLOGIES" | grep -Eq '(^|\s+)version(\s+|$)'; then
+  RM_PATHNAMES_version="$(realpath "$RM_VERSION_DIR/$RM_VERSION_FILE")"
+fi
+
+# validations
+
+uniquifyPaths() {
+  echo "$1" | tr ':' '\n' | uniq | tr '\n' ':' | sed -E 's/:{2,}/:/g' | sed -E 's/^://' | sed -E 's/:$//'
+}
+
+for t in $RM_TECHNOLOGIES; do
+  UP="$(eval "echo \$RM_PATHNAMES_$t")"
+  UP="$(uniquifyPaths "$UP")"
+  eval "RM_PATHNAMES_$t='$UP'"
+  verbose "INFO: $t paths=$(eval "echo \$RM_PATHNAMES_$t")"
+done
 
 # ensure only one positional argument given & that it's a supported value
 case "$RM_RELEASE_LEVEL" in
@@ -576,8 +699,14 @@ if [ "$RM_PRE" \> "$RM_RC" ]; then
 fi
 
 setVersions() {
-  for T in $RM_TECHNOLOGIES; do
-    setVersion_$T $1
+  for t in $RM_TECHNOLOGIES; do
+    local pathnames="$(eval "echo \$RM_PATHNAMES_$t")"
+    ORIG_IFS="$IFS"
+    export IFS=':'
+    for p in $pathnames; do
+      setVersion_$t $1 "$p"
+    done
+    export IFS="$ORIG_IFS"
   done
 }
 
@@ -585,17 +714,30 @@ verbose "INFO: invocation ok; checking required preconditions"
 
 git pull $RM_ORIGIN
 
-# check that all versions are exactly the same
-for T in $RM_TECHNOLOGIES; do
-  V="$(getVersion_$T)"
-  if [ -n "$V_LAST" ] && [ "$V_LAST" != "$V" ]; then
-    echo "ERROR: versions among different technology files differ: $T is at $V, but $T_LAST is at $V_LAST" >&2
-    exit $RM_ERR_VERSIONS
-  fi
-  V_LAST="$V"
-  T_LAST="$T"
+verbose "INFO: checking that all versions are exactly the same"
+for t in $RM_TECHNOLOGIES; do
+  pathnames="$(eval "echo \$RM_PATHNAMES_$t")"
+  ORIG_IFS="$IFS"
+  export IFS=':'
+  for p in $pathnames; do
+    fqpn="$(realpath "$p")"
+    debug "invoking: getVersion_$t $fqpn"
+    v="$(getVersion_$t "$fqpn")"
+    verbose "INFO: file '$fqpn' has version '$v'"
+    if [ -n "$v_last" ] && [ "$v_last" != "$v" ]; then
+      echo "ERROR: versions among different version files differ:" >&2
+      echo "$t is at $v in $p" >&2
+      echo "but" >&2
+      echo "$t_last is at $v_last in $p_last" >&2
+      exit $RM_ERR_VERSIONS
+    fi
+    v_last="$v"
+    t_last="$t"
+    p_last="$p"
+  done
+  export IFS="$ORIG_IFS"
 done
-RM_VERSION="$V_LAST"
+RM_VERSION="$v_last"
 
 if ! git diff --exit-code --no-patch; then
   echo 'ERROR: you have modified tracked files; only release from clean directories!' >&2
@@ -619,7 +761,7 @@ else
 fi
 
 RM_BRANCH="$(git status | head -n 1 | awk '{ print $3 }')"
-if ! $MATCH "^($RM_MAIN|$RM_BRANCH_PREFIX[0-9]{1,}\.[0-9]{1,}$RM_BRANCH_SUFFIX)$" "$RM_BRANCH"; then # it is not a main or a release branch
+if ! $MATCH "^($RM_MAIN|${RM_BRANCH_PREFIX}[0-9]{1,}\.[0-9]{1,}$RM_BRANCH_SUFFIX)$" "$RM_BRANCH"; then # it is not a main or a release branch
   echo "ERROR: you can only release from the $RM_MAIN branch or release branches! You are currently on $RM_BRANCH" >&2
   exit $RM_ERR_GIT_STATE
 else
@@ -721,7 +863,7 @@ if [ "$RM_BRANCH" == "$RM_MAIN" ]; then # this will be either an rc release resu
       git checkout $RM_MAIN
       verbose "INFO: checked out '$RM_MAIN'"
 
-      if [ -n "$RM_CHERRY_PICK_RELEASE_COMMIT_TO_MAIN" ]; then
+      if [ -n "$RM_CHERRY_PICK_FIRST_RC_COMMIT_TO_MAIN" ]; then
         git cherry-pick -x $RM_NEW_RELEASE_BRANCH # cherry pick from release branch to get release candidate commit in master
         verbose "INFO: cherry-picked '$RM_NEW_RELEASE_BRANCH' '$RM_RC' commit into '$RM_MAIN'"
       fi
@@ -743,7 +885,7 @@ if [ "$RM_BRANCH" == "$RM_MAIN" ]; then # this will be either an rc release resu
 
       applyChanges "bump to $RM_NEXT_RELEASE_BRANCH_VERSION [skip ci]"
 
-      verbose "INFO: released '$RM_RC' version '$RM_VERSION' in branch '$RM_NEW_RELEASE_BRANCH' ok."
+      verbose "INFO: released '$RM_RC' version '$RM_NEXT_RELEASE_BRANCH_VERSION' in branch '$RM_NEW_RELEASE_BRANCH' ok."
       exit 0
       ;;
 

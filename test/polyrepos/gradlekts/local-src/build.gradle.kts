@@ -1,0 +1,18 @@
+plugins {
+	id 'org.springframework.boot' version '2.4.5'
+	id 'io.spring.dependency-management' version '1.0.11.RELEASE'
+	id 'java'
+}
+
+group = "com.northscaler"
+version = "1.2.0-pre.3"
+sourceCompatibility = "11"
+project.ext.ignoreTests = true
+
+repositories {
+	mavenCentral()
+}
+
+dependencies {
+	implementation 'org.springframework.boot:spring-boot-starter-web'
+}

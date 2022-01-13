@@ -1,0 +1,32 @@
+#!/usr/bin/env bash
+set -e
+
+# This script releases this repo.
+
+THIS_ABSPATH="$(cd "$(dirname "$0")"; pwd)"
+
+# Update this value to have this repo use a different version of the release.sh script to release itself
+RM_USE_VERSION=2.0.0
+# Override the version in use if you want to by setting RM_VERSION before invoking this script
+RM_VERSION=${RM_VERSION:-$RM_USE_VERSION} # the git ref of the version of the release-management file you want to get
+
+# try with curl or wget, else fallback to docker
+if which -s curl; then
+  fetch='curl -s'
+elif which -s wget; then
+  fetch='wget -qO -'
+else
+  fetch='docker run --rm -i rancher/curl -s'
+fi
+
+# This is only here because we're eating our own dog food & don't want to overwrite files under source control
+RM_ANTICOLLISION_SUFFIX=.this
+
+get() {
+  $fetch https://gitlab.com/northscaler-public/release-management/-/raw/$RM_VERSION/$1 > "$THIS_ABSPATH/$1$RM_ANTICOLLISION_SUFFIX" && \
+  chmod +x "$THIS_ABSPATH/$1$RM_ANTICOLLISION_SUFFIX"
+}
+
+get release.sh
+
+"$THIS_ABSPATH/release.sh$RM_ANTICOLLISION_SUFFIX" --dev-qa --tech version $@

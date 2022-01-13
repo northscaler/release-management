@@ -7,28 +7,28 @@ set -e
 # You should gitignore the files you download using this script, otherwise it'll mess with your git status when releasing.
 
 # Update this value to have this repo use a different version of the release.sh script to release itself
-RM_USE_VERSION=2.0.0
+RM_USE_VERSION=2.0.3
 # Override the version in use if you want to by setting RM_VERSION before invoking this script
 RM_VERSION=${RM_VERSION:-$RM_USE_VERSION} # the git ref of the version of the release-management file you want to get
 
 THIS_ABSPATH="$(cd "$(dirname "$0")"; pwd)"
 
 # try with curl or wget, else fallback to docker
-if which curl; then
+if which -s curl; then
   fetch='curl -s '
-elif which wget; then
+elif which -s wget; then
   fetch='wget -qO - '
 else
   fetch='docker run --rm -i rancher/curl -s '
 fi
 
 get() {
-  $fetch https://gitlab.com/northscaler-public/release-management/-/raw/$RM_VERSION/$1 >"$THIS_ABSPATH/$1" && \
-  chmod +x "$THIS_ABSPATH/$1"
+  $fetch https://gitlab.com/northscaler-public/release-management/-/raw/$RM_VERSION/$1 >"$THIS_ABSPATH/$1"
 }
 
 # get any required files from Northscaler's release-management repo
 get release.sh
+chmod +x release.sh
 
 # Feel free to change this invocation to suit your needs
 "$THIS_ABSPATH/release.sh" --dev-qa $@
